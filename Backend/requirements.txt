@@ -1,0 +1,28 @@
+# Zerodha Broker
+kiteconnect
+
+# Auth & Login
+pyotp
+requests
+
+# Config
+python-dotenv
+pydantic
+pydantic-settings
+
+# Web Framework
+fastapi
+uvicorn[standard]
+jinja2
+
+# Data & Indicators
+pandas
+numpy
+pandas-ta
+
+# Database
+sqlalchemy
+psycopg2-binary
+
+# Utilities
+apscheduler

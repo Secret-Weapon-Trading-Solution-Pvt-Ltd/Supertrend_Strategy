@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Trend Trading System — Strategy Blueprint</title>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eef1f5;
+    --border: #d1d9e0;
+    --text-primary: #1f2328;
+    --text-secondary: #59636e;
+    --text-muted: #8b949e;
+    --green: #1a7f37;
+    --green-dim: #dafbe1;
+    --red: #d1242f;
+    --red-dim: #ffebe9;
+    --blue: #0969da;
+    --blue-dim: #ddf4ff;
+    --orange: #bf8700;
+    --orange-dim: #fff8c5;
+    --purple: #8250df;
+    --cyan: #0e8a7e;
+    --accent: #0969da;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar Navigation ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0;
+    width: 260px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 100;
+  }
+
+  nav .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  nav .logo h2 {
+    font-size: 16px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  nav .logo span {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  nav a {
+    display: block;
+    padding: 8px 20px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+
+  nav a:hover, nav a.active {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border-left-color: var(--accent);
+  }
+
+  nav a.section-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    pointer-events: none;
+  }
+
+  /* ── Main Content ── */
+  main {
+    margin-left: 260px;
+    flex: 1;
+    padding: 40px 60px;
+    max-width: 1100px;
+  }
+
+  h1 {
+    font-size: 32px;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+
+  h1 .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--green-dim);
+    color: var(--green);
+    vertical-align: middle;
+    margin-left: 12px;
+    font-weight: 600;
+  }
+
+  h2 {
+    font-size: 22px;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 12px;
+    color: var(--blue);
+  }
+
+  h4 {
+    font-size: 14px;
+    margin: 20px 0 8px;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  p, li { font-size: 14px; color: var(--text-secondary); }
+  p { margin-bottom: 12px; }
+  ul, ol { margin: 0 0 16px 20px; }
+  li { margin-bottom: 4px; }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+  }
+
+  /* ── Section container ── */
+  section {
+    margin-bottom: 24px;
+    scroll-margin-top: 20px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+
+  .card.green  { border-left: 4px solid var(--green); }
+  .card.red    { border-left: 4px solid var(--red); }
+  .card.blue   { border-left: 4px solid var(--blue); }
+  .card.orange { border-left: 4px solid var(--orange); }
+  .card.purple { border-left: 4px solid var(--purple); }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .card.green  .card-title { color: var(--green); }
+  .card.red    .card-title { color: var(--red); }
+  .card.blue   .card-title { color: var(--blue); }
+  .card.orange .card-title { color: var(--orange); }
+  .card.purple .card-title { color: var(--purple); }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+
+  th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    vertical-align: top;
+  }
+
+  tr:hover td { background: rgba(9,105,218,0.04); }
+
+  /* ── Toggle Switch ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+
+  .toggle-row.enabled { border-color: var(--green); }
+  .toggle-row.disabled { opacity: 0.5; }
+
+  .switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .switch input { opacity: 0; width: 0; height: 0; }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-tertiary);
+    border-radius: 22px;
+    transition: 0.3s;
+    border: 1px solid var(--border);
+  }
+
+  .slider::before {
+    content: "";
+    position: absolute;
+    height: 16px; width: 16px;
+    left: 2px; bottom: 2px;
+    background: var(--border);
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+
+  input:checked + .slider { background: var(--green); border-color: var(--green); }
+  input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+
+  .toggle-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 140px;
+  }
+
+  .toggle-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    flex: 1;
+  }
+
+  .toggle-status {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .toggle-status.on  { color: var(--green); background: var(--green-dim); }
+  .toggle-status.off { color: var(--text-muted); background: var(--bg-tertiary); }
+
+  /* ── Code Blocks ── */
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--purple);
+  }
+
+  pre {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-secondary);
+  }
+
+  .keyword { color: var(--purple); }
+  .string  { color: var(--green); }
+  .comment { color: var(--text-muted); font-style: italic; }
+  .type    { color: var(--orange); }
+
+  /* ── Architecture Diagram ── */
+  .arch-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .arch-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .arch-box {
+    padding: 14px 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 140px;
+    border: 2px solid;
+    position: relative;
+  }
+
+  .arch-box.frontend  { background: rgba(56,139,253,0.1);  border-color: var(--blue);   color: var(--blue); }
+  .arch-box.backend   { background: rgba(63,185,80,0.1);   border-color: var(--green);  color: var(--green); }
+  .arch-box.broker     { background: rgba(210,153,34,0.1);  border-color: var(--orange); color: var(--orange); }
+  .arch-box.engine    { background: rgba(188,140,255,0.1); border-color: var(--purple); color: var(--purple); }
+  .arch-box.data      { background: rgba(57,210,192,0.1);  border-color: var(--cyan);   color: var(--cyan); }
+  .arch-box.risk      { background: rgba(248,81,73,0.1);   border-color: var(--red);    color: var(--red); }
+
+  .arch-box small {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  .arch-arrow {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  /* ── State Machine ── */
+  .state-machine {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .state {
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 2px solid;
+  }
+
+  .state.idle    { border-color: var(--text-muted); color: var(--text-muted); background: rgba(110,118,129,0.1); }
+  .state.running { border-color: var(--green);      color: var(--green);      background: rgba(63,185,80,0.1); }
+  .state.paused  { border-color: var(--orange);     color: var(--orange);     background: rgba(210,153,34,0.1); }
+  .state.stopped { border-color: var(--red);        color: var(--red);        background: rgba(248,81,73,0.1); }
+  .state.error   { border-color: var(--red);        color: var(--red);        background: rgba(248,81,73,0.15); }
+
+  .arrow {
+    color: var(--text-muted);
+    font-size: 18px;
+  }
+
+  .arrow-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* ── Timeline / Plan ── */
+  .timeline {
+    position: relative;
+    padding-left: 28px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px; top: 6px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--blue);
+  }
+
+  .timeline-item.week2::before { border-color: var(--purple); }
+  .timeline-item.milestone::before { border-color: var(--green); background: var(--green); }
+
+  .timeline-day {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 4px;
+  }
+
+  .timeline-item.week2 .timeline-day { color: var(--purple); }
+  .timeline-item.milestone .timeline-day { color: var(--green); }
+
+  .timeline-tasks {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin: 0 4px 4px 0;
+    font-weight: 500;
+  }
+
+  .tag.entry  { background: var(--green-dim);  color: var(--green); }
+  .tag.exit   { background: var(--red-dim);    color: var(--red); }
+  .tag.ind    { background: var(--blue-dim);   color: var(--blue); }
+  .tag.risk   { background: var(--orange-dim); color: var(--orange); }
+  .tag.config { background: #f5f0ff;          color: var(--purple); }
+
+  /* ── Grid ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* ── Confluence Logic Diagram ── */
+  .confluence-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+
+  .confluence-flow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 12px 0;
+  }
+
+  .confluence-node {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid;
+  }
+
+  .confluence-node.signal  { border-color: var(--green);  color: var(--green);  background: var(--green-dim); }
+  .confluence-node.filter  { border-color: var(--blue);   color: var(--blue);   background: var(--blue-dim); }
+  .confluence-node.gate    { border-color: var(--orange);  color: var(--orange);  background: var(--orange-dim); }
+  .confluence-node.output  { border-color: var(--purple);  color: var(--purple);  background: #f5f0ff; }
+
+  .confluence-op {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 20px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SIDEBAR NAVIGATION                         -->
+<!-- ═══════════════════════════════════════════ -->
+<nav>
+  <div class="logo">
+    <h2>SWTS</h2>
+    <span>Super Trend Trading System</span>
+  </div>
+
+  <a href="#overview">Overview</a>
+
+  <a class="section-head">Strategy</a>
+  <a href="#indicators">Entry Indicators</a>
+  <a href="#confluence">Confluence Logic</a>
+  <a href="#timeframes">Timeframes</a>
+  <a href="#exit-conditions">Exit Conditions</a>
+
+  <a class="section-head">Segments</a>
+  <a href="#equity">Week 1 — Equity (NSE)</a>
+  <a href="#fno">Week 2 — F&amp;O (NFO)</a>
+
+  <a class="section-head">Configuration</a>
+  <a href="#config-params">Config Parameters</a>
+
+  <a class="section-head">Dev Plan</a>
+  <a href="#week1-plan">Week 1 Plan</a>
+  <a href="#week2-plan">Week 2 Plan</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- MAIN CONTENT                               -->
+<!-- ═══════════════════════════════════════════ -->
+<main>
+
+<!-- ─── Overview ─── -->
+<section id="overview">
+  <h1>Super Trend Trading System <span class="badge">Zerodha</span></h1>
+  <p class="subtitle">Long-only automated trading engine for NSE Equity &amp; F&amp;O segments via Zerodha Kite API</p>
+
+  <div class="grid-3">
+    <div class="card blue">
+      <div class="card-title">2 Indicators</div>
+      <p>Supertrend + ATR — each individually toggleable</p>
+    </div>
+    <div class="card red">
+      <div class="card-title">5 Exit Rules</div>
+      <p>Target, Fixed SL, Trailing SL, End of Session, Supertrend Red</p>
+    </div>
+    <div class="card green">
+      <div class="card-title">2 Segments</div>
+      <p>Equity (MIS) in Week 1, Futures &amp; Options in Week 2</p>
+    </div>
+  </div>
+
+  <div class="card orange">
+    <div class="card-title">Broker: Zerodha Kite Connect</div>
+    <p>All orders placed via Kite Connect API v3. Requires valid API key + access token. Supports regular, bracket, and cover orders. Market data via WebSocket (Kite Ticker).</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STRATEGY SPECIFICATION                     -->
+<!-- ═══════════════════════════════════════════ -->
+
+<!-- ─── Entry Indicators ─── -->
+<section id="indicators">
+  <h2>Entry Indicators</h2>
+  <p>Each indicator can be independently enabled or disabled. The system adapts its confluence logic based on which indicators are active.</p>
+
+  <div id="indicator-toggles">
+    <!-- Supertrend -->
+    <div class="toggle-row enabled" id="toggle-supertrend">
+      <label class="switch">
+        <input type="checkbox" checked onchange="toggleIndicator('supertrend', this)">
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">Supertrend</span>
+      <span class="toggle-desc">Long-only signal — generates BUY when Supertrend turns green (price crosses above ST line). Exit when ST turns red.</span>
+      <span class="toggle-status on" id="status-supertrend">ENABLED</span>
+    </div>
+
+    <!-- ATR -->
+    <div class="toggle-row enabled" id="toggle-atr">
+      <label class="switch">
+        <input type="checkbox" checked onchange="toggleIndicator('atr', this)">
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">ATR</span>
+      <span class="toggle-desc">Volatility filter &amp; dynamic SL sizing — filters low-volatility periods, sets stop loss as ATR multiple</span>
+      <span class="toggle-status on" id="status-atr">ENABLED</span>
+    </div>
+
+  </div>
+
+  <h3>Indicator Configuration Parameters</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Indicator</th>
+        <th>Parameter</th>
+        <th>Default</th>
+        <th>Range</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td rowspan="2"><span class="tag ind">Supertrend</span></td>
+        <td><code>st_length</code></td>
+        <td>10</td>
+        <td>5–50</td>
+        <td>ATR lookback period for Supertrend calculation</td>
+      </tr>
+      <tr>
+        <td><code>st_multiplier</code></td>
+        <td>3.0</td>
+        <td>1.0–6.0</td>
+        <td>ATR multiplier for band distance</td>
+      </tr>
+      <tr>
+        <td rowspan="2"><span class="tag ind">ATR</span></td>
+        <td><code>atr_period</code></td>
+        <td>14</td>
+        <td>5–50</td>
+        <td>Lookback period for ATR calculation</td>
+      </tr>
+      <tr>
+        <td><code>atr_threshold</code></td>
+        <td>1.0</td>
+        <td>0.5–5.0</td>
+        <td>Minimum ATR value to allow entries (volatility gate)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ─── Confluence Logic ─── -->
+<section id="confluence">
+  <h2>Confluence Logic</h2>
+  <p>Entry signals are generated by combining enabled indicators. The system dynamically adapts based on which indicators are active.</p>
+
+  <div class="confluence-box">
+    <h4>Signal Generation Flow</h4>
+    <div class="confluence-flow">
+      <div class="confluence-node signal">Supertrend Flip</div>
+      <div class="confluence-op">→</div>
+      <div class="confluence-node filter">ATR Gate<br><small>volatility &gt; threshold?</small></div>
+      <div class="confluence-op">→</div>
+      <div class="confluence-node output">ENTRY SIGNAL</div>
+    </div>
+  </div>
+
+  <h3>Confluence Rules (Long Only)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Active Indicators</th>
+        <th>BUY Entry (Supertrend turns Green)</th>
+        <th>EXIT (Supertrend turns Red)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tag ind">ST</span> only</td>
+        <td>Enter LONG when Supertrend flips green (price closes above ST line)</td>
+        <td>Exit position when Supertrend flips red (price closes below ST line)</td>
+      </tr>
+      <tr>
+        <td><span class="tag ind">ST</span> + <span class="tag ind">ATR</span></td>
+        <td>ST flips green <strong>AND</strong> ATR &gt; threshold (sufficient volatility)</td>
+        <td>Exit when Supertrend flips red (ATR not required for exit)</td>
+      </tr>
+      <tr>
+        <td><span class="tag ind">ATR</span> only</td>
+        <td colspan="2">ATR alone cannot generate entry signals — it only acts as a filter/gate. Supertrend must be enabled for signal generation.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card orange">
+    <div class="card-title">Long Only — No Short Selling</div>
+    <p>This is a <strong>long-only strategy</strong>. The system only takes BUY positions. When Supertrend turns red, the position is exited — no short/sell positions are opened. ATR acts as a volatility filter for entries only.</p>
+  </div>
+</section>
+
+<!-- ─── Timeframes ─── -->
+<section id="timeframes">
+  <h2>Timeframes</h2>
+  <p>The system must support <strong>all timeframes natively supported by Zerodha Kite Historical API</strong>. Candle data is fetched directly from Kite — no custom tick aggregation needed.</p>
+
+  <table>
+    <thead>
+      <tr><th>Timeframe</th><th>Candle Interval</th><th>Use Case</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>minute</code></td><td>1 minute</td><td>Scalping, fast intraday</td></tr>
+      <tr><td><code>3minute</code></td><td>3 minutes</td><td>Short-term intraday</td></tr>
+      <tr><td><code>5minute</code></td><td>5 minutes</td><td>Standard intraday swing</td></tr>
+      <tr><td><code>10minute</code></td><td>10 minutes</td><td>Medium intraday</td></tr>
+      <tr><td><code>15minute</code></td><td>15 minutes</td><td>Positional intraday</td></tr>
+      <tr><td><code>30minute</code></td><td>30 minutes</td><td>Wider intraday / short swing</td></tr>
+      <tr><td><code>60minute</code></td><td>1 hour</td><td>Swing trading</td></tr>
+      <tr><td><code>day</code></td><td>1 day</td><td>Daily / positional</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card blue">
+    <div class="card-title">Data Source</div>
+    <p>All candle data is fetched from Kite Historical Data API. Live candle updates via Kite Ticker WebSocket (tick-by-tick). Only Regular Trading Session (9:15–15:30 IST) data is used for indicator calculation.</p>
+  </div>
+</section>
+
+<!-- ─── Exit Conditions ─── -->
+<section id="exit-conditions">
+  <h2>Exit Conditions</h2>
+  <p>Comprehensive exit management ensures capital protection. Multiple exit conditions are evaluated every tick; the first triggered condition executes the exit.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Exit Type</th>
+        <th>Category</th>
+        <th>Config Parameter</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tag entry">Target (Take Profit)</span></td>
+        <td>Profit</td>
+        <td><code>target_type</code><br><code>target_value</code></td>
+        <td>points / 20</td>
+        <td>Exit when unrealized P&amp;L hits target. Types: <code>points</code>, <code>percentage</code>, <code>atr_multiple</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag exit">Stop Loss (Fixed)</span></td>
+        <td>Risk</td>
+        <td><code>sl_type</code><br><code>sl_value</code></td>
+        <td>points / 10</td>
+        <td>Fixed stop loss. Types: <code>points</code>, <code>percentage</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag exit">Stop Loss (Trailing)</span></td>
+        <td>Risk</td>
+        <td><code>trailing_sl</code><br><code>trail_value</code></td>
+        <td>true / 5</td>
+        <td>SL trails price by fixed points. Activates after position moves into profit.</td>
+      </tr>
+      <tr>
+        <td><span class="tag exit">End of Session</span></td>
+        <td>Time</td>
+        <td><code>session_end_time</code></td>
+        <td>15:15</td>
+        <td>Auto square-off all positions before market close (IST)</td>
+      </tr>
+      <tr>
+        <td><span class="tag ind">Supertrend Red</span></td>
+        <td>Signal</td>
+        <td><code>exit_on_st_red</code></td>
+        <td>true</td>
+        <td>Exit long position when Supertrend flips red (primary exit signal)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card red">
+    <div class="card-title">Exit Priority Order</div>
+    <p><strong>1.</strong> End of Session square-off → <strong>2.</strong> Fixed SL → <strong>3.</strong> Trailing SL → <strong>4.</strong> Target (take profit) → <strong>5.</strong> Supertrend turns red</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SEGMENTS                                   -->
+<!-- ═══════════════════════════════════════════ -->
+
+<section id="equity">
+  <h2>Week 1 — Equity Segment (NSE)</h2>
+
+  <div class="card green">
+    <div class="card-title">Direct Shares — MIS (Intraday Only)</div>
+    <p>Trade NSE-listed equities intraday with MIS product type and leverage.</p>
+  </div>
+
+  <div class="card blue">
+    <div class="card-title">Instrument Selection — Zerodha Symbol Master</div>
+    <p>All instruments are fetched from the <strong>Zerodha symbol master</strong> (Kite Instruments API). Users select instruments via a searchable dropdown in the UI — no hardcoded symbols. The symbol master is refreshed daily to stay in sync with exchange updates (new listings, lot size changes, expiry additions).</p>
+  </div>
+
+  <h3>Equity-Specific Configuration</h3>
+  <table>
+    <thead>
+      <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>equity_symbols</code></td><td>— (user selected)</td><td>Instruments selected from Zerodha symbol master (searchable dropdown)</td></tr>
+      <tr><td><code>product_type</code></td><td>MIS</td><td>MIS intraday product</td></tr>
+      <tr><td><code>max_open_positions</code></td><td>3</td><td>Maximum simultaneous positions</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="fno">
+  <h2>Week 2 — Futures &amp; Options Segment (NFO)</h2>
+
+  <div class="card purple">
+    <div class="card-title">Futures &amp; Options — Lots, Rollover, Strike Selection</div>
+    <p>Trade NIFTY/BANKNIFTY futures and options on the NFO segment. Lot-based sizing with expiry management.</p>
+  </div>
+
+  <h3>Futures</h3>
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Instruments</td><td>Selected from Zerodha symbol master — supports all NFO-listed futures</td></tr>
+      <tr><td>Lot Size</td><td>Fetched dynamically from Kite instrument master (lot sizes change periodically)</td></tr>
+      <tr><td>Product</td><td><code>kite.PRODUCT_MIS</code> (intraday) or <code>kite.PRODUCT_NRML</code> (carry)</td></tr>
+      <tr><td>Margin</td><td>Fetched from Kite Margins API (varies by SPAN + Exposure)</td></tr>
+      <tr><td>Rollover</td><td>Auto-detect expiry week. Option to roll position from current to next month contract 2 days before expiry.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Options</h3>
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Strategy</td><td>Long only — buy CE (Call) on BUY signal, exit when Supertrend turns red</td></tr>
+      <tr><td>Strike Selection</td><td>ATM ± <code>strike_offset</code> strikes (e.g., ATM+1 = 1 strike OTM)</td></tr>
+      <tr><td>Expiry</td><td>Current week (weekly) or current month (monthly) — configurable</td></tr>
+      <tr><td>Premium Filter</td><td>Skip if premium &gt; <code>max_option_premium</code> (avoid illiquid/expensive options)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>F&amp;O Configuration</h3>
+  <table>
+    <thead>
+      <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>fno_instrument</code></td><td>— (user selected)</td><td>F&amp;O instrument selected from Zerodha symbol master (searchable dropdown)</td></tr>
+      <tr><td><code>trade_futures</code></td><td>true</td><td>Enable futures trading</td></tr>
+      <tr><td><code>trade_options</code></td><td>false</td><td>Enable options trading</td></tr>
+      <tr><td><code>strike_offset</code></td><td>0</td><td>0 = ATM, 1 = 1 strike OTM, -1 = 1 ITM</td></tr>
+      <tr><td><code>option_expiry</code></td><td>weekly</td><td>weekly or monthly expiry</td></tr>
+      <tr><td><code>max_option_premium</code></td><td>300</td><td>Max premium (₹) per lot to pay</td></tr>
+      <tr><td><code>auto_rollover</code></td><td>true</td><td>Auto roll futures before expiry</td></tr>
+      <tr><td><code>rollover_days_before</code></td><td>2</td><td>Days before expiry to initiate rollover</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ─── Configuration Parameters ─── -->
+<section id="config-params">
+  <h2>Complete Configuration Reference</h2>
+  <p>All parameters with defaults. Configuration stored in <code>.env</code> + <code>config.json</code>. Pydantic validates on load.</p>
+
+  <h3>Core Settings</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>broker_mode</code></td><td>str</td><td>"forward_test"</td><td>"forward_test" or "live"</td></tr>
+      <tr><td><code>segment</code></td><td>str</td><td>"equity"</td><td>"equity" or "fno"</td></tr>
+      <tr><td><code>timeframe</code></td><td>str</td><td>"5m"</td><td>All Zerodha supported: minute, 3minute, 5minute, 10minute, 15minute, 30minute, 60minute, day</td></tr>
+      <tr><td><code>log_level</code></td><td>str</td><td>"INFO"</td><td>DEBUG, INFO, WARNING, ERROR</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Zerodha Credentials &amp; Auto-Login</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Source</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>KITE_API_KEY</code></td><td>.env</td><td>Kite Connect API key</td></tr>
+      <tr><td><code>KITE_API_SECRET</code></td><td>.env</td><td>Kite Connect API secret</td></tr>
+      <tr><td><code>KITE_USER_ID</code></td><td>.env</td><td>Zerodha client/user ID</td></tr>
+      <tr><td><code>KITE_PASSWORD</code></td><td>.env</td><td>Zerodha login password</td></tr>
+      <tr><td><code>KITE_TOTP_KEY</code></td><td>.env</td><td>TOTP secret key for 2FA (used to generate OTP programmatically)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card orange">
+    <div class="card-title">Daily Auto-Login at 8:30 AM IST</div>
+    <p>The system automatically logs into Zerodha every day at <strong>8:30 AM IST</strong> (before market opens at 9:15 AM). Uses the TOTP key to generate the 2FA OTP programmatically — no manual intervention needed. The login flow obtains a fresh <code>access_token</code> and initializes the Kite session for the day.</p>
+    <p style="margin-top: 8px;"><span class="tag config">Reference</span> Take reference from the <strong>Trade Distributor</strong> project for the auto-login implementation (TOTP-based Kite login flow).</p>
+  </div>
+
+  <h3>Risk Management</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>max_open_positions</code></td><td>int</td><td>3</td><td>Simultaneous open positions cap</td></tr>
+      <tr><td><code>session_end_time</code></td><td>str</td><td>"15:15"</td><td>Auto square-off time (IST)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TWO-WEEK DEVELOPER PLAN                    -->
+<!-- ═══════════════════════════════════════════ -->
+
+<section id="week1-plan">
+  <h2>Week 1 — Foundation + Equity</h2>
+
+  <div class="grid-2">
+    <div class="card green">
+      <div class="card-title">Project Setup &amp; Architecture</div>
+      <ul>
+        <li>Initialize repo, Python venv, install dependencies (<code>fastapi</code>, <code>kiteconnect</code>, <code>pandas</code>, <code>numpy</code>)</li>
+        <li>Define project folder structure and module boundaries</li>
+        <li>Set up database (PostgreSQL) and ORM</li>
+        <li>Docker Compose for local development</li>
+        <li>CI/CD pipeline skeleton</li>
+      </ul>
+    </div>
+
+    <div class="card orange">
+      <div class="card-title">Broker Integration (Zerodha)</div>
+      <ul>
+        <li>Implement <code>BrokerABC</code> interface and <code>ZerodhaBroker</code> class</li>
+        <li>Kite auth flow (API key → login → access token)</li>
+        <li>Build <code>ForwardTestBroker</code> for simulated trading</li>
+        <li>Kite Ticker WebSocket for live market data</li>
+        <li>Support all Zerodha Kite timeframes (minute to day) via Historical Data API</li>
+      </ul>
+    </div>
+
+    <div class="card purple">
+      <div class="card-title">User Management (Keycloak)</div>
+      <ul>
+        <li>Keycloak instance setup and realm configuration</li>
+        <li>User registration, login, and role-based access</li>
+        <li>JWT token validation in FastAPI middleware</li>
+        <li>Protected API routes — admin vs trader roles</li>
+        <li>Session management and token refresh</li>
+      </ul>
+    </div>
+
+    <div class="card blue">
+      <div class="card-title">Frontend UI</div>
+      <ul>
+        <li>React + Vite + TypeScript project setup</li>
+        <li>Dashboard layout — sidebar, controls, charts</li>
+        <li>Keycloak login integration (SSO)</li>
+        <li>Engine controls (Start / Stop / Pause)</li>
+        <li>Strategy panel with indicator toggles</li>
+        <li>Real-time P&amp;L chart and trade log</li>
+        <li>WebSocket hook for live data streaming</li>
+      </ul>
+    </div>
+
+    <div class="card green">
+      <div class="card-title">Strategy Engine — Running on Equity (NSE)</div>
+      <ul>
+        <li>Supertrend + ATR indicator engine with enable/disable toggles</li>
+        <li>Confluence logic (ST only, ST+ATR combinations)</li>
+        <li>Exit manager — 5 exit conditions (Target, Fixed SL, Trailing SL, End of Session, Supertrend Red)</li>
+        <li>Trading engine with state machine (IDLE → RUNNING ↔ PAUSED → STOPPED)</li>
+        <li>Equity segment handler (NSE, MIS intraday)</li>
+        <li>Position sizing, P&amp;L tracking, trade logging</li>
+      </ul>
+    </div>
+
+    <div class="card cyan" style="border-left: 4px solid var(--cyan);">
+      <div class="card-title" style="color: var(--cyan);">Forward Testing</div>
+      <ul>
+        <li>Build <code>ForwardTestBroker</code> — simulated order execution using live market data</li>
+        <li>Virtual position book with real-time P&amp;L calculation</li>
+        <li>No real orders placed — signals and exits validated against live ticks</li>
+        <li>End-to-end forward testing cycle: signal → simulated order → exit</li>
+        <li>Forward test trade log for strategy performance analysis</li>
+        <li>Toggle between <code>forward_test</code> and <code>live</code> mode via config</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--green); margin-top: 12px;">
+    <div class="card-title" style="color: var(--green);">Week 1 Milestone</div>
+    <p>Fully functional equity trading system with Keycloak auth, React dashboard, and strategy running on NSE stocks via forward test broker.</p>
+  </div>
+</section>
+
+<section id="week2-plan">
+  <h2>Week 2 — F&amp;O + Deployment</h2>
+
+  <div class="grid-2">
+    <div class="card purple">
+      <div class="card-title">F&amp;O Support</div>
+      <ul>
+        <li>Implement <code>FnOSegment</code> handler for futures and options</li>
+        <li>Instrument token resolution for NIFTY/BANKNIFTY FUT (current + next month)</li>
+        <li>Lot-based position sizing</li>
+        <li>NRML / MIS product selection for futures</li>
+        <li>Options support — long only, buy CE on BUY signal</li>
+        <li>Rollover and expiry management</li>
+      </ul>
+    </div>
+
+    <div class="card blue">
+      <div class="card-title">Strike Calculation &amp; Tracking</div>
+      <ul>
+        <li>ATM strike calculation from underlying LTP</li>
+        <li>Strike offset logic (ATM ± N strikes)</li>
+        <li>Weekly vs monthly expiry selection</li>
+        <li>Premium filter (skip if premium exceeds max)</li>
+        <li>Greeks display (delta/theta from option chain)</li>
+        <li>Live strike tracking and position monitoring on dashboard</li>
+      </ul>
+    </div>
+
+    <div class="card red" style="grid-column: 1 / -1;">
+      <div class="card-title">Production Deployment</div>
+      <ul>
+        <li>Docker Compose production setup (backend + frontend + Keycloak + DB)</li>
+        <li>Environment configuration and secrets management</li>
+        <li>Cloud deployment (AWS / VPS) with SSL</li>
+        <li>Monitoring, logging, and alerting setup</li>
+        <li>Final forward testing validation with live market data</li>
+        <li>Go-live checklist: API keys, margin requirements, risk limits</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--green); margin-top: 12px;">
+    <div class="card-title" style="color: var(--green);">Week 2 Milestone</div>
+    <p>Production-ready system with F&amp;O support, strike calculation, and deployed to production — forward-tested with live market data.</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- JAVASCRIPT                                 -->
+<!-- ═══════════════════════════════════════════ -->
+<script>
+function toggleIndicator(name, checkbox) {
+  const row = document.getElementById('toggle-' + name);
+  const status = document.getElementById('status-' + name);
+  if (checkbox.checked) {
+    row.classList.add('enabled');
+    row.classList.remove('disabled');
+    status.textContent = 'ENABLED';
+    status.classList.add('on');
+    status.classList.remove('off');
+  } else {
+    row.classList.remove('enabled');
+    row.classList.add('disabled');
+    status.textContent = 'DISABLED';
+    status.classList.remove('on');
+    status.classList.add('off');
+  }
+}
+
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav a[href^="#"]');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(section => {
+    const top = section.offsetTop - 80;
+    if (window.scrollY >= top) {
+      current = section.getAttribute('id');
+    }
+  });
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === '#' + current) {
+      link.classList.add('active');
+    }
+  });
+});
+</script>
+
+</body>
+</html>

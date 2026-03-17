@@ -18,7 +18,7 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Create all tables on startup if they don't exist."""
-    from models import account, trade, position   # noqa: F401 — register models
+    from models import account, trade, position, instrument   # noqa: F401 — register models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

@@ -1,10 +1,13 @@
 """
-Zerodha Kite Connect — Auth Helpers + Ticker
+Zerodha Kite Connect — Auth Helpers + TOTP Auto Login + Ticker
 """
 
 import os
+import re
 import json
 import logging
+import requests
+import pyotp
 from pathlib import Path
 from datetime import datetime
 
@@ -18,6 +21,9 @@ log = logging.getLogger(__name__)
 
 API_KEY    = os.environ["KITE_API_KEY"]
 API_SECRET = os.environ["KITE_API_SECRET"]
+USER_ID    = os.environ.get("KITE_USER_ID", "")
+PASSWORD   = os.environ.get("KITE_PASSWORD", "")
+TOTP_KEY   = os.environ.get("KITE_TOTP_KEY", "")
 
 SESSION_FILE = Path(__file__).parent / "session.json"
 
@@ -62,6 +68,88 @@ def clear_session() -> None:
 
 def get_login_url() -> str:
     return kite.login_url()
+
+
+def auto_login() -> str:
+    """
+    Fully automated TOTP login — no browser needed.
+    Returns access_token and saves session to session.json.
+    """
+    session = requests.Session()
+
+    # Step 1: Get sess_id from Kite login page
+    resp = session.get(f"https://kite.zerodha.com/connect/login?v=3&api_key={API_KEY}")
+    if "sess_id=" not in resp.url:
+        raise ValueError(f"Could not get sess_id. URL: {resp.url}")
+    session_id = resp.url.split("sess_id=")[1].split("&")[0]
+    log.info("Step 1: Got sess_id")
+
+    # Step 2: Submit user ID + password
+    r = session.post("https://kite.zerodha.com/api/login", data={
+        "user_id": USER_ID,
+        "password": PASSWORD,
+        "type": "user_id",
+    })
+    data = r.json()
+    if data.get("status") != "success":
+        raise ValueError(f"Login failed: {data.get('message')}")
+    request_id = data["data"]["request_id"]
+    log.info("Step 2: Password accepted")
+
+    # Step 3: Submit TOTP
+    totp_value = pyotp.TOTP(TOTP_KEY).now()
+    r2 = session.post("https://kite.zerodha.com/api/twofa", data={
+        "user_id":      USER_ID,
+        "request_id":   request_id,
+        "twofa_value":  totp_value,
+        "twofa_type":   "totp",
+        "skip_session": "true",
+    }, allow_redirects=True)
+    if r2.json().get("status") != "success":
+        raise ValueError(f"2FA failed: {r2.json().get('message')}")
+    log.info("Step 3: TOTP accepted")
+
+    # Step 4: Get request_token
+    request_token = _get_request_token(session, session_id)
+    log.info("Step 4: Got request_token")
+
+    # Step 5: Exchange request_token for access_token
+    access_token = exchange_token(request_token)
+    log.info("Auto login successful — user: %s", kite.profile().get("user_name"))
+    return access_token
+
+
+def _get_request_token(session: requests.Session, session_id: str) -> str:
+    """Extract request_token from Kite redirect after successful login."""
+    finish_url = f"https://kite.zerodha.com/connect/finish?sess_id={session_id}&api_key={API_KEY}"
+
+    try:
+        r = session.get(finish_url, allow_redirects=False)
+        if r.status_code == 302 and "request_token=" in r.headers.get("Location", ""):
+            return r.headers["Location"].split("request_token=")[1].split("&")[0]
+        r = session.get(finish_url, allow_redirects=True)
+        if "request_token=" in r.url:
+            return r.url.split("request_token=")[1].split("&")[0]
+    except requests.exceptions.ConnectionError as e:
+        match = re.search(r"request_token=([a-zA-Z0-9]+)", str(e))
+        if match:
+            return match.group(1)
+
+    # Auto-authorize app (first time only)
+    try:
+        r = session.post(
+            "https://kite.zerodha.com/connect/finish",
+            data={"api_key": API_KEY, "sess_id": session_id, "authorize": "1"},
+            allow_redirects=True,
+        )
+        if "request_token=" in r.url:
+            return r.url.split("request_token=")[1].split("&")[0]
+    except requests.exceptions.ConnectionError as e:
+        match = re.search(r"request_token=([a-zA-Z0-9]+)", str(e))
+        if match:
+            return match.group(1)
+
+    raise ValueError("Could not get request_token. Authorize the Kite app once manually in the browser.")
 
 
 def exchange_token(request_token: str) -> str:

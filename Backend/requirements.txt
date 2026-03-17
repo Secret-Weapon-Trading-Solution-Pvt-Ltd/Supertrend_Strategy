@@ -22,6 +22,10 @@ numpy
 # Database
 sqlalchemy
 psycopg2-binary
+asyncpg
+
+# Security
+cryptography
 
 # Utilities
 apscheduler

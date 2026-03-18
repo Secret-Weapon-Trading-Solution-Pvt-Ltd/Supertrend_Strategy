@@ -29,6 +29,8 @@ from strategy.indicators import calculate_supertrend, calculate_atr
 from strategy import signals as sig
 from strategy import exit_manager
 from config.settings import settings
+from events.event_bus import emit_sync
+from models.trade import save_trade_sync
 
 log = logging.getLogger(__name__)
 
@@ -163,6 +165,16 @@ class TradingEngine:
             round(atr_val, 2) if atr_val else "-",
         )
 
+        # Emit tick to frontend
+        emit_sync("tick", {
+            "timestamp":   ts,
+            "symbol":      self.symbol,
+            "close":       close,
+            "supertrend":  st_val,
+            "atr":         round(atr_val, 2) if atr_val else None,
+            "direction":   direction,
+        })
+
         # Step 3 — need at least 2 rows for signal
         if len(df) < 2:
             return
@@ -177,7 +189,12 @@ class TradingEngine:
 
             if signal == "BUY":
                 log.info("[ENGINE] BUY signal — placing order for %s qty=%d", self.symbol, self.qty)
-                self.broker.place_order(
+                emit_sync("signal:buy", {
+                    "symbol": self.symbol,
+                    "price":  close,
+                    "time":   ts,
+                })
+                order_id = self.broker.place_order(
                     symbol           = self.symbol,
                     token            = self.instrument_token,
                     qty              = self.qty,
@@ -185,6 +202,13 @@ class TradingEngine:
                     product          = "MIS",
                     order_type       = "MARKET",
                 )
+                emit_sync("order:placed", {
+                    "type":     "BUY",
+                    "symbol":   self.symbol,
+                    "qty":      self.qty,
+                    "price":    close,
+                    "order_id": order_id,
+                })
 
         # Step 5 — manage open position
         else:
@@ -193,6 +217,15 @@ class TradingEngine:
             # Update trailing SL peak (ForwardTestBroker has this; real broker tracks via Kite)
             if hasattr(self.broker, "update_peak_price"):
                 self.broker.update_peak_price(close)
+
+            # Emit live position update to frontend
+            emit_sync("position:update", {
+                "symbol":          position.get("symbol", self.symbol),
+                "entry_price":     position.get("entry_price", 0),
+                "current_price":   close,
+                "peak_price":      position.get("peak_price", 0),
+                "unrealized_pnl":  round((close - position.get("entry_price", close)) * position.get("qty", self.qty), 2),
+            })
 
             # Sync peak_price for exit_manager (real broker positions won't have this key)
             if "peak_price" not in position:
@@ -216,8 +249,16 @@ class TradingEngine:
                     summary["result"],
                 )
                 self.last_exit_reason = exit_reason
+                emit_sync("exit:triggered", {
+                    "reason":      exit_reason,
+                    "entry_price": summary["entry_price"],
+                    "exit_price":  summary["exit_price"],
+                    "pnl_points":  summary["pnl_points"],
+                    "pnl_amount":  summary["pnl_amount"],
+                    "result":      summary["result"],
+                })
 
-                self.broker.place_order(
+                order_id = self.broker.place_order(
                     symbol           = self.symbol,
                     token            = self.instrument_token,
                     qty              = position.get("qty", self.qty),
@@ -225,6 +266,30 @@ class TradingEngine:
                     product          = "MIS",
                     order_type       = "MARKET",
                 )
+                emit_sync("order:placed", {
+                    "type":     "SELL",
+                    "symbol":   self.symbol,
+                    "qty":      position.get("qty", self.qty),
+                    "price":    close,
+                    "order_id": order_id,
+                })
+
+                # Persist completed trade to DB
+                save_trade_sync({
+                    "symbol":           self.symbol,
+                    "instrument_token": self.instrument_token,
+                    "qty":              position.get("qty", self.qty),
+                    "entry_price":      summary["entry_price"],
+                    "exit_price":       summary["exit_price"],
+                    "pnl_points":       summary["pnl_points"],
+                    "pnl_amount":       summary["pnl_amount"],
+                    "result":           summary["result"],
+                    "exit_reason":      exit_reason,
+                    "broker_mode":      settings.broker_mode,
+                    "interval":         self.interval,
+                    "entry_time":       position.get("entry_time"),
+                    "exit_time":        None,   # defaults to now() in save_trade
+                })
 
     # ── Status ────────────────────────────────────────────────────────────────
 

@@ -29,3 +29,6 @@ cryptography
 
 # Utilities
 apscheduler
+
+# Socket.IO
+python-socketio[asyncio_client]

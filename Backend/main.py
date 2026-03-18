@@ -1,32 +1,75 @@
 """
 SWTS — Super Trend Trading System
-FastAPI entry point — Zerodha OAuth login, DB-backed session, KiteTicker.
+FastAPI + Socket.IO entry point.
+
+HTTP:      Zerodha OAuth login, DB-backed session, instrument search
+Socket.IO: Real-time engine control + event streaming to frontend
+
+Socket events (client → server):
+  engine:start       {symbol, token, qty, interval?}
+  engine:stop        {}
+  engine:pause       {}
+  engine:resume      {}
+  indicator:toggle   {name: "supertrend"|"atr", enabled: bool}
+  mode:switch        {mode: "forward_test"|"live"}
+  instruments:search {query, exchange?}   → returns instruments:results
+  trades:history     {limit?}             → returns trades:history
+
+Socket events (server → client):
+  tick               {close, supertrend, atr, direction, timestamp}
+  signal:buy         {symbol, price, time}
+  order:placed       {type, symbol, qty, price, order_id}
+  exit:triggered     {reason, entry, exit, pnl_points, result}
+  position:update    {entry_price, current_price, peak_price, unrealized_pnl}
+  engine:state       {state, symbol, interval}
+  timeframes         [{interval, label, minutes}]
+  instruments:results [{symbol, token, name, exchange, segment}]
+  log                {level, logger, message, timestamp}
 """
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
 
 import pytz
+import socketio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 import zeroda
-from models.database import async_session, init_db
+from broker.factory import create_broker
+from config.settings import settings
+from engine.trading_engine import TradingEngine
+from events.event_bus import emit, set_loop, sio
+from events.log_handler import install as install_log_handler
+from models.trade import set_loop as set_trade_loop
 from models.account import Account
+from models.instrument import Instrument
+from models.timeframe import Timeframe
+from models.trade import get_trade_history
+from models.database import async_session, init_db
 from broker.account_manager import load_and_autologin_all, disconnect_account
 from broker.instruments import refresh_instruments
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+logging.basicConfig(
+    level   = logging.INFO,
+    format  = "%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
 log = logging.getLogger(__name__)
 
 IST = pytz.timezone("Asia/Kolkata")
 
+# ── Global engine instance ────────────────────────────────────────────────────
+# Created when frontend sends engine:start, destroyed on engine:stop.
 
-# ── Daily 8:30 AM IST job — auto-login + refresh instruments + reconnect ticker
+_engine: TradingEngine | None = None
+_access_token: str | None     = None   # cached from startup / login
+
+
+# ── Daily 8:30 AM IST job ─────────────────────────────────────────────────────
 
 async def daily_autologin():
     """
@@ -35,27 +78,25 @@ async def daily_autologin():
     2. Refresh instruments from Zerodha → update instruments table.
     3. Reconnect KiteTicker with new access_token.
     """
+    global _access_token
     log.info("Scheduler: Daily auto-login starting (8:30 AM IST)...")
     try:
         async with async_session() as db:
-            # Step 1: TOTP auto-login — gets fresh access_token, saves to DB
             sessions = await load_and_autologin_all(db)
             if not sessions:
                 log.error("Scheduler: Auto-login failed — no accounts logged in")
                 return
-            access_token = next(iter(sessions.values()))
+            _access_token = next(iter(sessions.values()))
             log.info("Scheduler: Auto-login successful — %d account(s)", len(sessions))
 
-            # Step 2: Refresh instruments
             try:
                 total = await refresh_instruments(zeroda.kite, db)
                 log.info("Scheduler: %d instruments refreshed", total)
             except Exception as exc:
                 log.error("Scheduler: Instrument refresh failed: %s", exc)
 
-        # Step 3: Reconnect KiteTicker with fresh token
         try:
-            zeroda.init_ticker(access_token)
+            zeroda.init_ticker(_access_token)
             log.info("Scheduler: KiteTicker reconnected with fresh token")
         except Exception as exc:
             log.error("Scheduler: Ticker reconnect failed: %s", exc)
@@ -64,27 +105,38 @@ async def daily_autologin():
         log.error("Scheduler: daily_autologin error: %s", exc)
 
 
-# ── Startup: DB init → verify/auto-login → refresh instruments → ticker ──────
+# ── Startup / shutdown ────────────────────────────────────────────────────────
+
+from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _access_token
+
     await init_db()
 
-    # Start scheduler — daily auto-login at 8:30 AM IST
+    # Store running event loop — needed for thread-safe Socket.IO emits + DB writes
+    loop = asyncio.get_event_loop()
+    set_loop(loop)
+    set_trade_loop(loop)
+
+    # Install Socket.IO log handler — all logs stream to frontend from now
+    install_log_handler()
+
+    # Scheduler — daily auto-login at 8:30 AM IST
     scheduler = AsyncIOScheduler(timezone=IST)
     scheduler.add_job(
         daily_autologin,
-        trigger=CronTrigger(hour=8, minute=30, timezone=IST),
-        id="daily_autologin",
-        name="Daily Zerodha auto-login at 8:30 AM IST",
-        replace_existing=True,
+        trigger      = CronTrigger(hour=8, minute=30, timezone=IST),
+        id           = "daily_autologin",
+        name         = "Daily Zerodha auto-login at 8:30 AM IST",
+        replace_existing = True,
     )
     scheduler.start()
     log.info("Scheduler: Daily auto-login scheduled at 08:30 AM IST")
 
     try:
         async with async_session() as db:
-            # Step 1: Check for an existing valid token in DB
             result = await db.execute(
                 select(Account).where(
                     Account.is_active    == True,
@@ -98,22 +150,19 @@ async def lifespan(app: FastAPI):
                 valid, info = zeroda.verify_token(account.access_token)
                 if valid:
                     log.info("Startup: Token valid for %s", account.user_id)
-                    access_token = account.access_token
+                    _access_token = account.access_token
                 else:
-                    # Step 2: Token expired — run TOTP auto-login for all accounts
                     log.warning("Startup: Token invalid (%s) — running auto-login...", info)
                     sessions = await load_and_autologin_all(db)
-                    access_token = next(iter(sessions.values()), None) if sessions else None
+                    _access_token = next(iter(sessions.values()), None) if sessions else None
             else:
-                # Step 2: No account connected — run TOTP auto-login
                 log.warning("Startup: No connected account — running auto-login...")
                 sessions = await load_and_autologin_all(db)
-                access_token = next(iter(sessions.values()), None) if sessions else None
+                _access_token = next(iter(sessions.values()), None) if sessions else None
 
-            if not access_token:
+            if not _access_token:
                 log.warning("Startup: No access token available — manual login required")
             else:
-                # Step 3: Refresh instruments from Zerodha
                 log.info("Startup: Refreshing instruments...")
                 try:
                     total = await refresh_instruments(zeroda.kite, db)
@@ -121,9 +170,8 @@ async def lifespan(app: FastAPI):
                 except Exception as exc:
                     log.error("Startup: Instrument refresh failed: %s", exc)
 
-                # Step 4: Connect KiteTicker
                 try:
-                    zeroda.init_ticker(access_token)
+                    zeroda.init_ticker(_access_token)
                     log.info("Startup: KiteTicker connecting...")
                 except Exception as exc:
                     log.error("Startup: Ticker init failed: %s", exc)
@@ -133,57 +181,57 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Shutdown
+    if _engine:
+        _engine.stop()
     scheduler.shutdown()
     log.info("Scheduler: stopped")
 
 
-app = FastAPI(title="SWTS", lifespan=lifespan)
-templates = Jinja2Templates(directory="templates")
+# ── FastAPI app ───────────────────────────────────────────────────────────────
+
+fastapi_app = FastAPI(title="SWTS", lifespan=lifespan)
+templates   = Jinja2Templates(directory="templates")
 
 
 # ── OAuth login routes ────────────────────────────────────────────────────────
 
-@app.get("/", response_class=HTMLResponse)
+@fastapi_app.get("/", response_class=HTMLResponse)
 async def index(request: Request, request_token: str | None = None, status: str | None = None):
-    """
-    - No params                          → check session, show login or dashboard
-    - ?request_token=xxx&status=success  → exchange token, save, connect ticker
-    """
+    global _access_token
 
-    # Zerodha OAuth redirect — exchange request_token for access_token
     if request_token and status == "success":
         try:
-            access_token = zeroda.exchange_token(request_token)
+            _access_token = zeroda.exchange_token(request_token)
             profile = zeroda.kite.profile()
 
-            # Save access_token to DB accounts table
             async with async_session() as db:
                 result = await db.execute(
                     select(Account).where(Account.user_id == profile["user_id"])
                 )
                 account = result.scalars().first()
                 if account:
-                    account.access_token  = access_token
-                    account.is_connected  = True
+                    account.access_token = _access_token
+                    account.is_connected = True
                 else:
                     db.add(Account(
                         label        = profile.get("user_name", profile["user_id"]),
                         user_id      = profile["user_id"],
                         api_key      = zeroda.API_KEY,
                         auth_method  = "oauth",
-                        access_token = access_token,
+                        access_token = _access_token,
                         is_active    = True,
                         is_connected = True,
                     ))
                 await db.commit()
 
-            zeroda.init_ticker(access_token)
+            zeroda.init_ticker(_access_token)
             return templates.TemplateResponse("index.html", {
                 "request":      request,
                 "logged_in":    True,
                 "user_name":    profile["user_name"],
                 "user_id":      profile["user_id"],
-                "access_token": access_token,
+                "access_token": _access_token,
             })
         except Exception as exc:
             return templates.TemplateResponse("index.html", {
@@ -193,7 +241,6 @@ async def index(request: Request, request_token: str | None = None, status: str 
                 "login_url": zeroda.get_login_url(),
             })
 
-    # Check existing session from DB
     async with async_session() as db:
         result = await db.execute(
             select(Account).where(
@@ -216,7 +263,6 @@ async def index(request: Request, request_token: str | None = None, status: str 
                 "access_token": account.access_token,
             })
 
-    # Not logged in — show login page
     return templates.TemplateResponse("index.html", {
         "request":   request,
         "logged_in": False,
@@ -224,13 +270,12 @@ async def index(request: Request, request_token: str | None = None, status: str 
     })
 
 
-@app.get("/logout")
+@fastapi_app.get("/logout")
 async def logout():
     try:
         zeroda.kite.invalidate_access_token()
     except Exception:
         pass
-    # Clear access_token + is_connected from DB for all accounts
     async with async_session() as db:
         result = await db.execute(select(Account).where(Account.is_connected == True))
         accounts = result.scalars().all()
@@ -239,9 +284,9 @@ async def logout():
     return RedirectResponse(url="/")
 
 
-# ── Status & Ticker API ───────────────────────────────────────────────────────
+# ── Status & Ticker REST ──────────────────────────────────────────────────────
 
-@app.get("/status")
+@fastapi_app.get("/status")
 async def api_status():
     async with async_session() as db:
         result = await db.execute(
@@ -256,23 +301,22 @@ async def api_status():
     if account:
         valid, result = zeroda.verify_token(account.access_token)
         if valid:
-            profile = result
             return {
                 "logged_in": True,
-                "user":      profile["user_name"],
-                "user_id":   profile["user_id"],
+                "user":      result["user_name"],
+                "user_id":   result["user_id"],
                 "ticker":    zeroda.ticker_status(),
             }
         return {"logged_in": False, "reason": result, "ticker": zeroda.ticker_status()}
     return {"logged_in": False, "reason": "No connected account in DB", "ticker": zeroda.ticker_status()}
 
 
-@app.get("/ticker/status")
+@fastapi_app.get("/ticker/status")
 async def ticker_status():
     return zeroda.ticker_status()
 
 
-@app.post("/ticker/subscribe")
+@fastapi_app.post("/ticker/subscribe")
 async def ticker_subscribe(request: Request):
     body = await request.json()
     tokens: list[int] = body.get("tokens", [])
@@ -282,7 +326,7 @@ async def ticker_subscribe(request: Request):
     return {"subscribed": tokens, "ticker": zeroda.ticker_status()}
 
 
-@app.post("/ticker/unsubscribe")
+@fastapi_app.post("/ticker/unsubscribe")
 async def ticker_unsubscribe(request: Request):
     body = await request.json()
     tokens: list[int] = body.get("tokens", [])
@@ -290,6 +334,234 @@ async def ticker_unsubscribe(request: Request):
     return {"unsubscribed": tokens, "ticker": zeroda.ticker_status()}
 
 
-@app.get("/ticker/ticks")
+@fastapi_app.get("/ticker/ticks")
 async def ticker_ticks():
     return zeroda.get_ticks()
+
+
+# ── Socket.IO event handlers (client → server) ────────────────────────────────
+
+@sio.event
+async def connect(sid, environ):
+    log.info("Socket.IO client connected: %s", sid)
+    # Push timeframes immediately so frontend can populate dropdown
+    await _send_timeframes(sid)
+    # Send current engine state if engine is already running
+    if _engine:
+        await sio.emit("engine:state", _engine.status(), to=sid)
+
+
+@sio.event
+async def disconnect(sid):
+    log.info("Socket.IO client disconnected: %s", sid)
+
+
+@sio.on("engine:start")
+async def on_engine_start(sid, data: dict):
+    """
+    Start the trading engine.
+    data: {symbol, token, qty, interval?}
+    """
+    global _engine
+
+    if not _access_token:
+        await sio.emit("error", {"message": "Not logged in — no access token"}, to=sid)
+        return
+
+    if _engine and _engine.state.value == "RUNNING":
+        await sio.emit("error", {"message": "Engine already running"}, to=sid)
+        return
+
+    symbol   = data.get("symbol")
+    token    = data.get("token")
+    qty      = data.get("qty", 1)
+    interval = data.get("interval", settings.timeframe)
+
+    if not symbol or not token:
+        await sio.emit("error", {"message": "symbol and token are required"}, to=sid)
+        return
+
+    try:
+        broker  = create_broker(_access_token)
+        _engine = TradingEngine(
+            broker           = broker,
+            instrument_token = int(token),
+            symbol           = symbol,
+            qty              = int(qty),
+            interval         = interval,
+        )
+        _engine.start()
+        await emit("engine:state", _engine.status())
+        log.info("Engine started: %s %s qty=%d", symbol, interval, qty)
+    except Exception as exc:
+        log.error("engine:start failed: %s", exc)
+        await sio.emit("error", {"message": str(exc)}, to=sid)
+
+
+@sio.on("engine:stop")
+async def on_engine_stop(sid, data: dict):
+    global _engine
+    if not _engine:
+        return
+    _engine.stop()
+    await emit("engine:state", _engine.status())
+    _engine = None
+
+
+@sio.on("engine:pause")
+async def on_engine_pause(sid, data: dict):
+    if _engine:
+        _engine.pause()
+        await emit("engine:state", _engine.status())
+
+
+@sio.on("engine:resume")
+async def on_engine_resume(sid, data: dict):
+    if _engine:
+        _engine.resume()
+        await emit("engine:state", _engine.status())
+
+
+@sio.on("indicator:toggle")
+async def on_indicator_toggle(sid, data: dict):
+    """
+    Enable or disable an indicator at runtime.
+    data: {name: "supertrend" | "atr", enabled: bool}
+    """
+    name    = data.get("name")
+    enabled = bool(data.get("enabled", True))
+
+    if name == "supertrend":
+        settings.use_supertrend = enabled
+        log.info("Supertrend indicator %s", "ENABLED" if enabled else "DISABLED")
+    elif name == "atr":
+        settings.use_atr = enabled
+        log.info("ATR indicator %s", "ENABLED" if enabled else "DISABLED")
+    else:
+        await sio.emit("error", {"message": f"Unknown indicator: {name}"}, to=sid)
+        return
+
+    await emit("indicator:state", {"name": name, "enabled": enabled})
+
+
+@sio.on("mode:switch")
+async def on_mode_switch(sid, data: dict):
+    """
+    Switch between forward_test and live mode.
+    data: {mode: "forward_test" | "live"}
+    Restarts the engine with the new broker if engine is running.
+    """
+    global _engine
+
+    mode = data.get("mode")
+    if mode not in ("forward_test", "live"):
+        await sio.emit("error", {"message": "mode must be 'forward_test' or 'live'"}, to=sid)
+        return
+
+    settings.broker_mode = mode
+    log.info("Broker mode switched to: %s", mode.upper())
+
+    # If engine is running — restart with new broker
+    if _engine and _engine.state.value == "RUNNING":
+        symbol   = _engine.symbol
+        token    = _engine.instrument_token
+        qty      = _engine.qty
+        interval = _engine.interval
+
+        _engine.stop()
+        broker  = create_broker(_access_token)
+        _engine = TradingEngine(
+            broker           = broker,
+            instrument_token = token,
+            symbol           = symbol,
+            qty              = qty,
+            interval         = interval,
+        )
+        _engine.start()
+        log.info("Engine restarted in %s mode", mode.upper())
+
+    await emit("mode:state", {"mode": mode})
+
+
+# ── Data handlers — timeframes + instrument search ───────────────────────────
+
+async def _send_timeframes(sid: str) -> None:
+    """Fetch active timeframes from DB and emit to a specific client."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(Timeframe)
+            .where(Timeframe.is_active == True)
+            .order_by(Timeframe.minutes)
+        )
+        timeframes = result.scalars().all()
+
+    data = [
+        {"interval": tf.interval, "label": tf.label, "minutes": tf.minutes}
+        for tf in timeframes
+    ]
+    await sio.emit("timeframes", data, to=sid)
+
+
+@sio.on("trades:history")
+async def on_trades_history(sid, data: dict):
+    """
+    Fetch trade history from DB.
+    data: {limit?: 100}
+    Emits: trades:history [{id, symbol, qty, entry_price, exit_price, pnl_amount, result, exit_reason, ...}]
+    """
+    limit  = int(data.get("limit", 100))
+    trades = await get_trade_history(limit)
+    await sio.emit("trades:history", trades, to=sid)
+
+
+@sio.on("instruments:search")
+async def on_instruments_search(sid, data: dict):
+    """
+    Search instruments from DB by symbol or name.
+    data: {query: "RELI", exchange?: "NSE"}
+    Emits: instruments:results [{symbol, token, name, exchange, segment, lot_size}]
+    """
+    query    = data.get("query", "").strip()
+    exchange = data.get("exchange", None)
+
+    if len(query) < 2:
+        await sio.emit("instruments:results", [], to=sid)
+        return
+
+    pattern = f"%{query}%"
+
+    async with async_session() as db:
+        stmt = (
+            select(Instrument)
+            .where(
+                or_(
+                    Instrument.tradingsymbol.ilike(pattern),
+                    Instrument.name.ilike(pattern),
+                )
+            )
+        )
+        if exchange:
+            stmt = stmt.where(Instrument.exchange == exchange.upper())
+
+        stmt = stmt.order_by(Instrument.tradingsymbol).limit(20)
+        result = await db.execute(stmt)
+        instruments = result.scalars().all()
+
+    results = [
+        {
+            "symbol":   inst.tradingsymbol,
+            "token":    inst.instrument_token,
+            "name":     inst.name,
+            "exchange": inst.exchange,
+            "segment":  inst.segment,
+            "lot_size": inst.lot_size,
+        }
+        for inst in instruments
+    ]
+    await sio.emit("instruments:results", results, to=sid)
+
+
+# ── ASGI app — wraps FastAPI with Socket.IO ───────────────────────────────────
+# This is what uvicorn serves.
+
+app = socketio.ASGIApp(sio, fastapi_app)

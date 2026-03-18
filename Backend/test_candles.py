@@ -24,7 +24,6 @@ from models.database import async_session
 from models.account import Account
 from models.instrument import Instrument
 from models.timeframe import Timeframe
-from config.settings import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s")
 log = logging.getLogger(__name__)
@@ -42,8 +41,8 @@ LOOKBACK_DAYS = {
 }
 
 
-async def get_access_token(db) -> str:
-    """Fetch access_token from the first active connected account in DB."""
+async def get_account(db) -> Account:
+    """Fetch api_key + access_token from the first active connected account in DB."""
     result = await db.execute(
         select(Account).where(
             Account.is_active    == True,
@@ -57,8 +56,8 @@ async def get_access_token(db) -> str:
             "No connected account found in DB.\n"
             "Fix: Run the app, login via Zerodha, then re-run this test."
         )
-    log.info("Using account: %s (%s)", account.label, account.user_id)
-    return account.access_token
+    log.info("Using account: %s (%s) | api_key: %s", account.label, account.user_id, account.api_key)
+    return account
 
 
 async def get_instrument_token(db, symbol: str, exchange: str) -> int:
@@ -114,9 +113,9 @@ async def main():
 
     async with async_session() as db:
 
-        # Step 1: Get access_token from accounts table
-        print("Step 1: Loading access_token from DB (accounts table)...")
-        access_token = await get_access_token(db)
+        # Step 1: Get api_key + access_token from accounts table
+        print("Step 1: Loading api_key + access_token from DB (accounts table)...")
+        account = await get_account(db)
         print("  Done.\n")
 
         # Step 2: Validate interval against timeframes table
@@ -129,10 +128,10 @@ async def main():
         instrument_token = await get_instrument_token(db, symbol, exchange)
         print(f"  instrument_token = {instrument_token}\n")
 
-    # Step 4: Set access_token on KiteConnect and fetch candles
+    # Step 4: Set api_key + access_token from DB on KiteConnect and fetch candles
     print("Step 4: Fetching historical candles from Zerodha...")
-    kite = KiteConnect(api_key=settings.kite_api_key)
-    kite.set_access_token(access_token)
+    kite = KiteConnect(api_key=account.api_key)
+    kite.set_access_token(account.access_token)
 
     days      = LOOKBACK_DAYS.get(interval, 30)
     to_date   = datetime.now()

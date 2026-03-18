@@ -4,14 +4,11 @@ Zerodha Kite Connect — Auth Helpers + TOTP Auto Login + Ticker
 
 import os
 import re
-import json
 import logging
 import requests
 import pyotp
-from pathlib import Path
-from datetime import datetime
 
-from kiteconnect import KiteConnect
+from kiteconnect.connect import KiteConnect
 from kiteconnect.exceptions import TokenException
 from dotenv import load_dotenv
 
@@ -25,8 +22,6 @@ USER_ID    = os.environ.get("KITE_USER_ID", "")
 PASSWORD   = os.environ.get("KITE_PASSWORD", "")
 TOTP_KEY   = os.environ.get("KITE_TOTP_KEY", "")
 
-SESSION_FILE = Path(__file__).parent / "session.json"
-
 # Shared KiteConnect instance
 kite = KiteConnect(api_key=API_KEY)
 
@@ -35,33 +30,6 @@ _ticker = None  # KiteTicker — imported lazily inside init_ticker()
 _ticker_connected: bool    = False
 _subscribed_tokens: list   = []
 _latest_ticks: dict        = {}
-
-
-# ── Session persistence ───────────────────────────────────────────────────────
-
-def save_session(access_token: str) -> None:
-    data = {
-        "access_token": access_token,
-        "login_time":   datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-    SESSION_FILE.write_text(json.dumps(data, indent=2))
-    log.info("Session saved to session.json")
-
-
-def load_session() -> dict | None:
-    if not SESSION_FILE.exists():
-        return None
-    try:
-        return json.loads(SESSION_FILE.read_text())
-    except Exception as exc:
-        log.warning("Could not read session.json: %s", exc)
-        return None
-
-
-def clear_session() -> None:
-    if SESSION_FILE.exists():
-        SESSION_FILE.unlink()
-    log.info("Session cleared")
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -153,37 +121,28 @@ def _get_request_token(session: requests.Session, session_id: str) -> str:
 
 
 def exchange_token(request_token: str) -> str:
-    """Exchange request_token -> access_token, save to session.json."""
+    """Exchange request_token -> access_token and set on kite instance."""
     session = kite.generate_session(request_token, api_secret=API_SECRET)
     access_token = session["access_token"]
     kite.set_access_token(access_token)
-    save_session(access_token)
     return access_token
 
 
-def verify_and_restore() -> tuple[bool, str | None]:
+def verify_token(access_token: str) -> tuple[bool, dict | str]:
     """
-    Load token from session.json, apply it to kite, then verify by calling
-    kite.profile().
+    Apply access_token from DB to kite instance and verify with Zerodha.
 
     Returns:
         (True,  profile_dict)  — token is valid
-        (False, reason_string) — token missing or rejected by Zerodha
+        (False, reason_string) — token rejected by Zerodha
     """
-    session = load_session()
-    if not session or not session.get("access_token"):
-        return False, "No saved session — please login"
-
-    token = session["access_token"]
-    kite.set_access_token(token)
-
+    kite.set_access_token(access_token)
     try:
         profile = kite.profile()
         log.info("Token valid — user: %s", profile.get("user_name"))
         return True, profile
     except TokenException:
-        log.warning("Token rejected by Zerodha — clearing session")
-        clear_session()
+        log.warning("Token rejected by Zerodha")
         return False, "Access token expired or invalid — please re-login"
     except Exception as exc:
         log.error("Could not verify token: %s", exc)
@@ -202,7 +161,7 @@ def init_ticker(access_token: str) -> None:
         except Exception:
             pass
 
-    from kiteconnect import KiteTicker
+    from kiteconnect.ticker import KiteTicker
     _ticker = KiteTicker(API_KEY, access_token)
 
     def on_connect(ws, response):

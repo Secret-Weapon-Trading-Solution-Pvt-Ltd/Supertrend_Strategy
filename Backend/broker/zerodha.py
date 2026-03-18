@@ -8,7 +8,7 @@ import logging
 import pandas as pd
 from datetime import datetime, timedelta
 
-from kiteconnect import KiteConnect
+from kiteconnect.connect import KiteConnect
 from broker.base import BrokerABC
 from config.settings import settings
 
@@ -149,7 +149,7 @@ class ZerodhaBroker(BrokerABC):
 
     def init_ticker(self, access_token: str) -> None:
         """Connect KiteTicker WebSocket in a background thread."""
-        from kiteconnect import KiteTicker
+        from kiteconnect.ticker import KiteTicker
 
         if self._ticker:
             try:

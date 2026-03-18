@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.account import Account
 from config.crypto import encrypt, decrypt
-from zeroda import auto_login as totp_auto_login, kite, save_session
+from zeroda import auto_login as totp_auto_login, kite
 
 
 async def add_account(
@@ -68,7 +68,7 @@ async def login_account(db: AsyncSession, account_id: str) -> str:
     zeroda.PASSWORD   = decrypt(row.password_encrypted)
     zeroda.TOTP_KEY   = decrypt(row.totp_key_encrypted)
 
-    # Run TOTP login — saves session.json + sets kite access token
+    # Run TOTP login — sets kite access token + returns access_token
     access_token = totp_auto_login()
 
     # Persist access_token to DB

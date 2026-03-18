@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket } from "../socket/socket"
 import { EVT_LOG } from "../socket/events"
-import { LogEntry } from "../types"
+import type { LogEntry } from "../types"
 
 const MAX_LOGS = 200   // keep last 200 entries to avoid memory bloat
 

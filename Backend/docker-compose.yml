@@ -55,18 +55,14 @@ services:
         condition: service_started
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # nginx is commented out until the React frontend is ready (Day 3)
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: swts_nginx
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/conf.d/default.conf
-  #   depends_on:
-  #     - backend
-  #     - keycloak
+  frontend:
+    build: ../Frontend
+    container_name: swts_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
 
 volumes:
   postgres_data:

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket, emit } from "../socket/socket"
 import { EVT_TIMEFRAMES, EVT_INSTRUMENTS_RESULTS } from "../socket/events"
-import { Timeframe, Instrument, InstrumentSearchPayload } from "../types"
+import type { Timeframe, Instrument, InstrumentSearchPayload } from "../types"
 
 export function useTimeframes() {
   const [timeframes, setTimeframes] = useState<Timeframe[]>([])

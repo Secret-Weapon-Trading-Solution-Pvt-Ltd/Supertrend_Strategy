@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket, emit } from "../socket/socket"
 import { EVT_TRADES_HISTORY, EVT_EXIT_TRIGGERED } from "../socket/events"
-import { Trade } from "../types"
+import type { Trade } from "../types"
 
 export function useTrades() {
   const [trades, setTrades] = useState<Trade[]>([])

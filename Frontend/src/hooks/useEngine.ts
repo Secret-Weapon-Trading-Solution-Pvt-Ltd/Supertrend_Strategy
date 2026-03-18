@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket, emit } from "../socket/socket"
 import { EVT_ENGINE_STATE } from "../socket/events"
-import { EngineState, EngineStartPayload } from "../types"
+import type { EngineState, EngineStartPayload } from "../types"
 
 export function useEngine() {
   const [engineState, setEngineState] = useState<EngineState | null>(null)

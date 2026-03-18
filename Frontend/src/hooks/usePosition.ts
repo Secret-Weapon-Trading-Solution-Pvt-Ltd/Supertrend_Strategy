@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket } from "../socket/socket"
 import { EVT_POSITION_UPDATE, EVT_EXIT_TRIGGERED, EVT_SIGNAL_BUY, EVT_ORDER_PLACED } from "../socket/events"
-import { PositionUpdate, ExitTriggered, SignalBuy, OrderPlaced } from "../types"
+import type { PositionUpdate, ExitTriggered, SignalBuy, OrderPlaced } from "../types"
 
 export function usePosition() {
   const [position, setPosition]       = useState<PositionUpdate | null>(null)

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { socket } from "../socket/socket"
 import { EVT_TICK } from "../socket/events"
-import { Tick } from "../types"
+import type { Tick } from "../types"
 
 export function useTick() {
   const [tick, setTick] = useState<Tick | null>(null)

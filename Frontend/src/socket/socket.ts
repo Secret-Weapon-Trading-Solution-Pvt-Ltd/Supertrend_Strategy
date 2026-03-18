@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { io, Socket } from "socket.io-client"
-import {
+import type {
   EngineStartPayload,
   IndicatorTogglePayload,
   ModeSwitchPayload,

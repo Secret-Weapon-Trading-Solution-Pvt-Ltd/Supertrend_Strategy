@@ -1,30 +1,21 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// types/index.ts — All TypeScript types for SWTS Socket.IO events
-// Mirrors the exact payloads emitted by the backend.
-// ─────────────────────────────────────────────────────────────────────────────
+// types/index.ts - All TypeScript types for SWTS Socket.IO events
 
-
-// ── Server → Client events ───────────────────────────────────────────────────
-
-/** Emitted every poll cycle (~1s) with latest indicator values */
-export interface Tick {
-  timestamp:  string        // "HH:MM:SS"
-  symbol:     string        // "RELIANCE"
-  close:      number        // 2450.75
-  supertrend: number | null // null if supertrend disabled
-  atr:        number | null // null if atr disabled
+export type Tick = {
+  timestamp:  string
+  symbol:     string
+  close:      number
+  supertrend: number | null
+  atr:        number | null
   direction:  "GREEN" | "RED" | "?"
 }
 
-/** Emitted when Supertrend flips green — BUY signal generated */
-export interface SignalBuy {
-  symbol: string  // "RELIANCE"
-  price:  number  // 2450.75
-  time:   string  // "09:32:15"
+export type SignalBuy = {
+  symbol: string
+  price:  number
+  time:   string
 }
 
-/** Emitted after every BUY or SELL order is placed */
-export interface OrderPlaced {
+export type OrderPlaced = {
   type:     "BUY" | "SELL"
   symbol:   string
   qty:      number
@@ -32,34 +23,38 @@ export interface OrderPlaced {
   order_id: string
 }
 
-/** Emitted every tick while a position is open */
-export interface PositionUpdate {
+export type PositionUpdate = {
   symbol:         string
   entry_price:    number
   current_price:  number
   peak_price:     number
-  unrealized_pnl: number  // (current - entry) × qty
+  unrealized_pnl: number
 }
 
-/** Emitted when an exit condition is triggered */
-export interface ExitTriggered {
+export type ExitTriggered = {
   reason:      "SESSION_END" | "FIXED_SL" | "TRAILING_SL" | "TARGET" | "ST_RED"
   entry_price: number
   exit_price:  number
-  pnl_points:  number  // per share
-  pnl_amount:  number  // pnl_points × qty
+  pnl_points:  number
+  pnl_amount:  number
   result:      "PROFIT" | "LOSS"
 }
 
-/** Emitted on connect and on every engine state change */
-export interface EngineState {
+export type ActivePosition = {
+  symbol:      string
+  qty:         number
+  entry_price: number
+  peak_price:  number
+}
+
+export type EngineState = {
   state:             "IDLE" | "RUNNING" | "PAUSED" | "STOPPED"
   symbol:            string
   interval:          string
-  timestamp?:        string       // last candle timestamp
+  timestamp?:        string
   close?:            number
   supertrend?:       number | null
-  st_direction?:     number | null // +1 green | -1 red
+  st_direction?:     number | null
   atr?:              number | null
   last_signal?:      "BUY" | "EXIT" | "HOLD"
   last_exit_reason?: string
@@ -67,33 +62,22 @@ export interface EngineState {
   last_error?:       string
 }
 
-/** Current open position — part of EngineState */
-export interface ActivePosition {
-  symbol:      string
-  qty:         number
-  entry_price: number
-  peak_price:  number
+export type Timeframe = {
+  interval: string
+  label:    string
+  minutes:  number
 }
 
-/** One timeframe option — emitted as array on connect */
-export interface Timeframe {
-  interval: string  // "5minute" — passed to engine:start
-  label:    string  // "5 Minutes" — shown in dropdown
-  minutes:  number  // 5 — for sorting
+export type Instrument = {
+  symbol:   string
+  token:    number
+  name:     string
+  exchange: string
+  segment:  string
+  lot_size: number
 }
 
-/** One instrument from search results */
-export interface Instrument {
-  symbol:   string  // "RELIANCE" — passed to engine:start
-  token:    number  // 738561 — instrument_token for Zerodha
-  name:     string  // "Reliance Industries Ltd"
-  exchange: string  // "NSE"
-  segment:  string  // "NSE_EQ"
-  lot_size: number  // 1 for equity
-}
-
-/** One completed trade from DB — returned in trades:history array */
-export interface Trade {
+export type Trade = {
   id:          number
   symbol:      string
   qty:         number
@@ -105,58 +89,51 @@ export interface Trade {
   exit_reason: "SESSION_END" | "FIXED_SL" | "TRAILING_SL" | "TARGET" | "ST_RED"
   broker_mode: "forward_test" | "live"
   interval:    string
-  entry_time:  string | null  // ISO string
-  exit_time:   string | null  // ISO string
+  entry_time:  string | null
+  exit_time:   string | null
 }
 
-/** One log entry — emitted for every log.info/warning/error in backend */
-export interface LogEntry {
+export type LogEntry = {
   level:     "DEBUG" | "INFO" | "WARNING" | "ERROR"
-  logger:    string   // "engine.trading_engine"
-  message:   string   // "[ENGINE] BUY signal ..."
-  timestamp: string   // "2026-03-18 09:32:15"
+  logger:    string
+  message:   string
+  timestamp: string
 }
 
-/** Emitted when indicator is toggled */
-export interface IndicatorState {
+export type IndicatorState = {
   name:    "supertrend" | "atr"
   enabled: boolean
 }
 
-/** Emitted when broker mode is switched */
-export interface ModeState {
+export type ModeState = {
   mode: "forward_test" | "live"
 }
 
-/** Error emitted by backend on invalid commands */
-export interface ServerError {
+export type ServerError = {
   message: string
 }
 
-
-// ── Client → Server events ───────────────────────────────────────────────────
-
-export interface EngineStartPayload {
+export type EngineStartPayload = {
   symbol:    string
   token:     number
   qty:       number
-  interval?: string  // defaults to settings.timeframe on backend
+  interval?: string
 }
 
-export interface IndicatorTogglePayload {
+export type IndicatorTogglePayload = {
   name:    "supertrend" | "atr"
   enabled: boolean
 }
 
-export interface ModeSwitchPayload {
+export type ModeSwitchPayload = {
   mode: "forward_test" | "live"
 }
 
-export interface InstrumentSearchPayload {
+export type InstrumentSearchPayload = {
   query:     string
-  exchange?: string  // "NSE" | "NFO" | "BSE"
+  exchange?: string
 }
 
-export interface TradesHistoryPayload {
-  limit?: number  // default 100
+export type TradesHistoryPayload = {
+  limit?: number
 }

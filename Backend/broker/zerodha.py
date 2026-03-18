@@ -111,24 +111,49 @@ class ZerodhaBroker(BrokerABC):
     def place_order(self, symbol: str, token: int, qty: int,
                     transaction_type: str, product: str,
                     order_type: str, price: float = 0) -> str:
-        return self.kite.place_order(
-            variety          = self.kite.VARIETY_REGULAR,
-            exchange         = self.kite.EXCHANGE_NSE,
-            tradingsymbol    = symbol,
-            transaction_type = transaction_type,
-            quantity         = qty,
-            product          = product,
-            order_type       = order_type,
-            price            = price if price else None,
+        """
+        Place a real order on Zerodha via Kite Connect.
+        Returns order_id on success, raises exception on failure.
+        """
+        log.info(
+            "Placing order: %s %s | qty=%d | type=%s | product=%s | price=%s",
+            transaction_type, symbol, qty, order_type, product,
+            price if price else "MARKET",
         )
 
+        try:
+            order_id = self.kite.place_order(
+                variety          = self.kite.VARIETY_REGULAR,
+                exchange         = self.kite.EXCHANGE_NSE,
+                tradingsymbol    = symbol,
+                transaction_type = transaction_type,
+                quantity         = qty,
+                product          = product,
+                order_type       = order_type,
+                price            = price if price else None,
+            )
+            log.info("Order placed successfully: order_id=%s | %s %s qty=%d", order_id, transaction_type, symbol, qty)
+            return order_id
+
+        except Exception as e:
+            log.error("Order placement failed: %s %s qty=%d | error=%s", transaction_type, symbol, qty, e)
+            raise
+
     def cancel_order(self, order_id: str) -> None:
-        self.kite.cancel_order(variety=self.kite.VARIETY_REGULAR, order_id=order_id)
+        """Cancel an existing order by order_id."""
+        try:
+            self.kite.cancel_order(variety=self.kite.VARIETY_REGULAR, order_id=order_id)
+            log.info("Order cancelled: order_id=%s", order_id)
+        except Exception as e:
+            log.error("Cancel failed: order_id=%s | error=%s", order_id, e)
+            raise
 
     def get_positions(self) -> list[dict]:
+        """Returns list of net positions."""
         return self.kite.positions()["net"]
 
     def get_order_status(self, order_id: str) -> dict:
+        """Returns the latest status of an order."""
         history = self.kite.order_history(order_id)
         return history[-1] if history else {}
 

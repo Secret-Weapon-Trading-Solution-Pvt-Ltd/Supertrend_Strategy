@@ -1,10 +1,12 @@
 """
 engine/trading_engine.py — Core trading engine polling loop.
 
-Responsibilities (current scope):
-  1. Poll kite.historical_data() every 1 second via ZerodhaBroker
+Responsibilities:
+  1. Poll kite.historical_data() every 1 second via broker
   2. Feed candles to strategy/indicators.py (Supertrend + ATR)
-  3. Log indicator values each poll
+  3. Generate signals via strategy/signals.py
+  4. Check exit conditions via strategy/exit_manager.py
+  5. Place BUY / SELL orders via broker (real or simulated)
 
 State machine:
   IDLE → RUNNING → PAUSED → STOPPED
@@ -22,8 +24,10 @@ from enum import Enum
 
 import pandas as pd
 
-from broker.zerodha import ZerodhaBroker
+from broker.base import BrokerABC
 from strategy.indicators import calculate_supertrend, calculate_atr
+from strategy import signals as sig
+from strategy import exit_manager
 from config.settings import settings
 
 log = logging.getLogger(__name__)
@@ -40,9 +44,10 @@ class TradingEngine:
 
     def __init__(
         self,
-        broker:           ZerodhaBroker,
+        broker:           BrokerABC,
         instrument_token: int,
         symbol:           str,
+        qty:              int = 1,
         interval:         str = None,
         candle_count:     int = 100,
         poll_interval:    float = 1.0,
@@ -50,6 +55,7 @@ class TradingEngine:
         self.broker           = broker
         self.instrument_token = instrument_token
         self.symbol           = symbol
+        self.qty              = qty
         self.interval         = interval or settings.timeframe
         self.candle_count     = candle_count
         self.poll_interval    = poll_interval
@@ -61,6 +67,8 @@ class TradingEngine:
         # Latest computed data — readable from outside
         self.latest_df: pd.DataFrame = pd.DataFrame()
         self.last_error: str         = ""
+        self.last_signal: str        = "HOLD"
+        self.last_exit_reason: str   = ""
 
     # ── State machine ─────────────────────────────────────────────────────────
 
@@ -114,10 +122,11 @@ class TradingEngine:
     def _tick(self) -> None:
         """
         One poll cycle:
-          1. Fetch latest candles from Zerodha
-          2. Run Supertrend (if enabled)
-          3. Run ATR (if enabled)
-          4. Store result in self.latest_df
+          1. Fetch latest candles
+          2. Run Supertrend + ATR indicators
+          3. Generate entry signal
+          4. If no position — check for BUY
+          5. If in position — update peak, check exits, place SELL if triggered
         """
         # Step 1 — fetch candles
         df = self.broker.get_candles(
@@ -130,31 +139,92 @@ class TradingEngine:
             log.warning("Empty candle data for %s", self.symbol)
             return
 
-        # Step 2 — Supertrend
+        # Step 2 — indicators
         if settings.use_supertrend:
             df = calculate_supertrend(df)
 
-        # Step 3 — ATR
         if settings.use_atr:
             df = calculate_atr(df)
 
-        # Store latest
         self.latest_df = df
 
-        # Log last row
-        last = df.iloc[-1]
-        ts   = df.index[-1].strftime("%H:%M:%S")
-
-        st_val  = round(last.get("supertrend",   float("nan")), 2) if "supertrend"   in df.columns else "-"
-        st_dir  = int(last.get("st_direction", 0))                  if "st_direction" in df.columns else "-"
-        atr_val = round(last.get("atr",          float("nan")), 2) if "atr"          in df.columns else "-"
-
+        # Extract last row values
+        last      = df.iloc[-1]
+        ts        = df.index[-1].strftime("%H:%M:%S")
+        close     = float(last["close"])
+        st_dir    = int(last.get("st_direction", 0))   if "st_direction" in df.columns else 0
+        st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else float("nan")
+        atr_val   = float(last.get("atr", 0.0))        if "atr"          in df.columns else None
         direction = "GREEN" if st_dir == 1 else "RED" if st_dir == -1 else "?"
 
         log.info(
             "[%s] %s | close=%.2f | ST=%.2f (%s) | ATR=%s",
-            ts, self.symbol, last["close"], st_val, direction, atr_val,
+            ts, self.symbol, close, st_val, direction,
+            round(atr_val, 2) if atr_val else "-",
         )
+
+        # Step 3 — need at least 2 rows for signal
+        if len(df) < 2:
+            return
+
+        # Step 4 — check for entry (no open position)
+        positions = self.broker.get_positions()
+        in_position = bool(positions)
+
+        if not in_position:
+            signal = sig.get_signal(df)
+            self.last_signal = signal
+
+            if signal == "BUY":
+                log.info("[ENGINE] BUY signal — placing order for %s qty=%d", self.symbol, self.qty)
+                self.broker.place_order(
+                    symbol           = self.symbol,
+                    token            = self.instrument_token,
+                    qty              = self.qty,
+                    transaction_type = "BUY",
+                    product          = "MIS",
+                    order_type       = "MARKET",
+                )
+
+        # Step 5 — manage open position
+        else:
+            position = positions[0]
+
+            # Update trailing SL peak (ForwardTestBroker has this; real broker tracks via Kite)
+            if hasattr(self.broker, "update_peak_price"):
+                self.broker.update_peak_price(close)
+
+            # Sync peak_price for exit_manager (real broker positions won't have this key)
+            if "peak_price" not in position:
+                position["peak_price"] = position.get("entry_price", close)
+
+            exit_reason = exit_manager.check(
+                position      = position,
+                current_price = close,
+                st_direction  = st_dir,
+                atr_value     = atr_val,
+            )
+
+            if exit_reason != exit_manager.HOLD:
+                summary = exit_manager.exit_summary(exit_reason, position, close)
+                log.info(
+                    "[ENGINE] EXIT — reason=%s | entry=%.2f | exit=%.2f | P&L=%.2f (%s)",
+                    exit_reason,
+                    summary["entry_price"],
+                    summary["exit_price"],
+                    summary["pnl_points"],
+                    summary["result"],
+                )
+                self.last_exit_reason = exit_reason
+
+                self.broker.place_order(
+                    symbol           = self.symbol,
+                    token            = self.instrument_token,
+                    qty              = position.get("qty", self.qty),
+                    transaction_type = "SELL",
+                    product          = "MIS",
+                    order_type       = "MARKET",
+                )
 
     # ── Status ────────────────────────────────────────────────────────────────
 
@@ -175,6 +245,21 @@ class TradingEngine:
                 "st_direction": int(last.get("st_direction", 0))                if "st_direction" in self.latest_df.columns else None,
                 "atr":         round(last.get("atr",          float("nan")), 2) if "atr"          in self.latest_df.columns else None,
             })
+
+        result["last_signal"]      = self.last_signal
+        result["last_exit_reason"] = self.last_exit_reason
+
+        positions = self.broker.get_positions()
+        if positions:
+            p = positions[0]
+            result["position"] = {
+                "symbol":      p.get("symbol", self.symbol),
+                "qty":         p.get("qty", 0),
+                "entry_price": p.get("entry_price", 0),
+                "peak_price":  p.get("peak_price", 0),
+            }
+        else:
+            result["position"] = None
 
         if self.last_error:
             result["last_error"] = self.last_error

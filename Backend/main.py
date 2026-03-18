@@ -37,7 +37,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, or_
+from sqlalchemy import select
 
 import zeroda
 from broker.factory import create_broker
@@ -47,12 +47,12 @@ from events.event_bus import emit, set_loop, sio
 from events.log_handler import install as install_log_handler
 from models.trade import set_loop as set_trade_loop
 from models.account import Account
-from models.instrument import Instrument
 from models.timeframe import Timeframe
-from models.trade import get_trade_history
 from models.database import async_session, init_db
 from broker.account_manager import load_and_autologin_all, disconnect_account
 from broker.instruments import refresh_instruments
+from api.routes_market import router as market_router
+from api.routes_trades import router as trades_router
 
 logging.basicConfig(
     level   = logging.INFO,
@@ -192,6 +192,9 @@ async def lifespan(app: FastAPI):
 
 fastapi_app = FastAPI(title="SWTS", lifespan=lifespan)
 templates   = Jinja2Templates(directory="templates")
+
+fastapi_app.include_router(market_router)
+fastapi_app.include_router(trades_router)
 
 
 # ── OAuth login routes ────────────────────────────────────────────────────────
@@ -344,8 +347,6 @@ async def ticker_ticks():
 @sio.event
 async def connect(sid, environ):
     log.info("Socket.IO client connected: %s", sid)
-    # Push timeframes immediately so frontend can populate dropdown
-    await _send_timeframes(sid)
     # Send current engine state if engine is already running
     if _engine:
         await sio.emit("engine:state", _engine.status(), to=sid)
@@ -483,82 +484,6 @@ async def on_mode_switch(sid, data: dict):
     await emit("mode:state", {"mode": mode})
 
 
-# ── Data handlers — timeframes + instrument search ───────────────────────────
-
-async def _send_timeframes(sid: str) -> None:
-    """Fetch active timeframes from DB and emit to a specific client."""
-    async with async_session() as db:
-        result = await db.execute(
-            select(Timeframe)
-            .where(Timeframe.is_active == True)
-            .order_by(Timeframe.minutes)
-        )
-        timeframes = result.scalars().all()
-
-    data = [
-        {"interval": tf.interval, "label": tf.label, "minutes": tf.minutes}
-        for tf in timeframes
-    ]
-    await sio.emit("timeframes", data, to=sid)
-
-
-@sio.on("trades:history")
-async def on_trades_history(sid, data: dict):
-    """
-    Fetch trade history from DB.
-    data: {limit?: 100}
-    Emits: trades:history [{id, symbol, qty, entry_price, exit_price, pnl_amount, result, exit_reason, ...}]
-    """
-    limit  = int(data.get("limit", 100))
-    trades = await get_trade_history(limit)
-    await sio.emit("trades:history", trades, to=sid)
-
-
-@sio.on("instruments:search")
-async def on_instruments_search(sid, data: dict):
-    """
-    Search instruments from DB by symbol or name.
-    data: {query: "RELI", exchange?: "NSE"}
-    Emits: instruments:results [{symbol, token, name, exchange, segment, lot_size}]
-    """
-    query    = data.get("query", "").strip()
-    exchange = data.get("exchange", None)
-
-    if len(query) < 2:
-        await sio.emit("instruments:results", [], to=sid)
-        return
-
-    pattern = f"%{query}%"
-
-    async with async_session() as db:
-        stmt = (
-            select(Instrument)
-            .where(
-                or_(
-                    Instrument.tradingsymbol.ilike(pattern),
-                    Instrument.name.ilike(pattern),
-                )
-            )
-        )
-        if exchange:
-            stmt = stmt.where(Instrument.exchange == exchange.upper())
-
-        stmt = stmt.order_by(Instrument.tradingsymbol).limit(20)
-        result = await db.execute(stmt)
-        instruments = result.scalars().all()
-
-    results = [
-        {
-            "symbol":   inst.tradingsymbol,
-            "token":    inst.instrument_token,
-            "name":     inst.name,
-            "exchange": inst.exchange,
-            "segment":  inst.segment,
-            "lot_size": inst.lot_size,
-        }
-        for inst in instruments
-    ]
-    await sio.emit("instruments:results", results, to=sid)
 
 
 # ── ASGI app — wraps FastAPI with Socket.IO ───────────────────────────────────

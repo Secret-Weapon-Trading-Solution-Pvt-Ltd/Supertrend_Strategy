@@ -30,7 +30,7 @@ cryptography
 # Utilities
 apscheduler
 pytz
-pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git@development
+stockstats
 
 # Socket.IO
 python-socketio[asyncio_client]

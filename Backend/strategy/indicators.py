@@ -1,5 +1,5 @@
 """
-strategy/indicators.py — Supertrend + ATR calculation using pandas_ta.
+strategy/indicators.py — Supertrend + ATR calculation using stockstats.
 
 Usage:
     from strategy.indicators import calculate_supertrend, calculate_atr
@@ -10,7 +10,7 @@ Usage:
 """
 
 import pandas as pd
-import pandas_ta as ta
+from stockstats import StockDataFrame
 
 from config.settings import settings
 
@@ -28,24 +28,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         df["st_direction"] = 0
         return df
 
-    st = ta.supertrend(
-        high       = df["high"],
-        low        = df["low"],
-        close      = df["close"],
-        length     = settings.st_length,
-        multiplier = settings.st_multiplier,
+    # Configure stockstats Supertrend parameters
+    StockDataFrame.SUPERTREND_MUL         = settings.st_multiplier
+    StockDataFrame.SUPERTREND_EMA_PERIOD  = settings.st_length
+
+    stock = StockDataFrame.retype(df.copy())
+    stock["supertrend"]  # trigger calculation — adds supertrend, supertrend_ub, supertrend_lb
+
+    result = df.copy()
+    result["supertrend"] = stock["supertrend"].values
+
+    # Derive direction: close above supertrend line = bullish (+1), below = bearish (-1)
+    close = df["close"].to_numpy()
+    st    = result["supertrend"].to_numpy()
+    direction = pd.array(
+        [1 if c > s else -1 if c < s else 0 for c, s in zip(close, st)],
+        dtype=int,
     )
+    result["st_direction"] = direction
 
-    # pandas_ta returns columns like:
-    #   SUPERT_7_3.0   — the ST line
-    #   SUPERTd_7_3.0  — direction: 1 = bullish, -1 = bearish
-    st_col  = [c for c in st.columns if c.startswith("SUPERT_")  and "d" not in c][0]
-    dir_col = [c for c in st.columns if c.startswith("SUPERTd_")][0]
-
-    df["supertrend"]   = st[st_col]
-    df["st_direction"] = st[dir_col]
-
-    return df
+    return result
 
 
 def calculate_atr(df: pd.DataFrame) -> pd.DataFrame:
@@ -59,11 +61,10 @@ def calculate_atr(df: pd.DataFrame) -> pd.DataFrame:
         df["atr"] = float("nan")
         return df
 
-    df["atr"] = ta.atr(
-        high   = df["high"],
-        low    = df["low"],
-        close  = df["close"],
-        length = settings.atr_period,
-    )
+    stock = StockDataFrame.retype(df.copy())
+    atr_col = f"atr_{settings.atr_period}"
+    stock[atr_col]  # trigger calculation
 
-    return df
+    result = df.copy()
+    result["atr"] = stock[atr_col].values
+    return result

@@ -1,17 +1,22 @@
-INFO:     Will watch for changes in these directories: ['C:\\Users\\powar\\Downloads\\SWTS\\Supertrend_Strategy\\Backend']
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [12384] using WatchFiles
-INFO:     Started server process [11888]
+INFO:     Started server process [21524]
 INFO:     Waiting for application startup.
-2026-03-18 15:59:56,037 INFO apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-18 15:59:56,040 INFO apscheduler.scheduler — Added job "Daily Zerodha auto-login at 8:30 AM IST" to job store "default"
-2026-03-18 15:59:56,040 INFO apscheduler.scheduler — Scheduler started
-2026-03-18 15:59:56,040 INFO main — Scheduler: Daily auto-login scheduled at 08:30 AM IST
-2026-03-18 15:59:57,327 INFO zeroda — Token valid — user: Swapnil Dashrath Raykar
-2026-03-18 15:59:57,327 INFO main — Startup: Token valid for BG9107
-2026-03-18 15:59:57,327 INFO main — Startup: Refreshing instruments...
-2026-03-18 16:00:27,732 INFO main — Startup: 107353 instruments loaded
-2026-03-18 16:00:28,863 INFO zeroda — KiteTicker connecting in background...
-2026-03-18 16:00:28,863 INFO main — Startup: KiteTicker connecting...
+2026-03-18 16:19:48,352 INFO apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-18 16:19:48,353 INFO apscheduler.scheduler — Added job "Daily Zerodha auto-login at 8:30 AM IST" to job store "default"
+2026-03-18 16:19:48,354 INFO apscheduler.scheduler — Scheduler started
+2026-03-18 16:19:48,354 INFO main — Scheduler: Daily auto-login scheduled at 08:30 AM IST
+2026-03-18 16:19:49,643 INFO zeroda — Token valid — user: Swapnil Dashrath Raykar
+2026-03-18 16:19:49,643 INFO main — Startup: Token valid for BG9107
+2026-03-18 16:19:49,643 INFO main — Startup: Refreshing instruments...
+2026-03-18 16:20:13,508 INFO main — Startup: 107353 instruments loaded
+2026-03-18 16:20:14,054 INFO zeroda — KiteTicker connecting in background...
+2026-03-18 16:20:14,054 INFO main — Startup: KiteTicker connecting...
 INFO:     Application startup complete.
-2026-03-18 16:00:28,935 INFO zeroda — KiteTicker connected
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
+INFO:     Waiting for application shutdown.
+2026-03-18 16:20:14,058 INFO main — Scheduler: stopped
+2026-03-18 16:20:14,058 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+NSE: 9459 instruments saved.
+NFO: 51570 instruments saved.
+BSE: 12606 instruments saved.
+MCX: 33718 instruments saved.

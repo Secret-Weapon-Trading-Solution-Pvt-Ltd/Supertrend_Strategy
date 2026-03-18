@@ -1,20 +1,16 @@
 """
-engine/trading_engine.py — Core trading engine polling loop.
+engine/trading_engine.py — Core trading engine with NumPy ring buffer.
 
-Responsibilities:
-  1. Poll kite.historical_data() every 1 second via broker
-  2. Feed candles to strategy/indicators.py (Supertrend + ATR)
-  3. Generate signals via strategy/signals.py
-  4. Check exit conditions via strategy/exit_manager.py
-  5. Place BUY / SELL orders via broker (real or simulated)
+Design:
+  Startup  : fetch 100 candles ONCE → fill NumPy buffer → compute indicators (warmup)
+  Runtime  : poll every CHECK_INTERVAL seconds → fetch 3 latest candles
+             → if new candle detected → roll buffer → recalculate → signal check
+             → no new candle → emit tick with last known data, skip signal check
 
-State machine:
-  IDLE → RUNNING → PAUSED → STOPPED
-
-Usage:
-    engine = TradingEngine(broker, instrument_token, interval)
-    engine.start()
-    engine.stop()
+Benefits over old approach:
+  - API calls   : 100 candles once, then 3 candles per check (not 100 every second)
+  - Memory      : fixed-size NumPy arrays, in-place roll (no new objects per tick)
+  - Signal logic: only runs on confirmed new candle close (no false flips)
 """
 
 import logging
@@ -22,6 +18,7 @@ import time
 import threading
 from enum import Enum
 
+import numpy as np
 import pandas as pd
 
 from broker.base import BrokerABC
@@ -33,6 +30,21 @@ from events.event_bus import emit_sync
 from models.trade import save_trade_sync
 
 log = logging.getLogger(__name__)
+
+# Seconds per candle interval
+_CANDLE_SECONDS = {
+    "minute":   60,
+    "3minute":  180,
+    "5minute":  300,
+    "10minute": 600,
+    "15minute": 900,
+    "30minute": 1800,
+    "60minute": 3600,
+    "day":      86400,
+}
+
+# How often to check Zerodha for a new candle (seconds)
+_CHECK_INTERVAL = 10
 
 
 class EngineState(Enum):
@@ -52,7 +64,6 @@ class TradingEngine:
         qty:              int = 1,
         interval:         str = None,
         candle_count:     int = 100,
-        poll_interval:    float = 1.0,
     ):
         self.broker           = broker
         self.instrument_token = instrument_token
@@ -60,19 +71,29 @@ class TradingEngine:
         self.qty              = qty
         self.interval         = interval or settings.timeframe
         self.candle_count     = candle_count
-        self.poll_interval    = poll_interval
 
         self.state            = EngineState.IDLE
         self._thread: threading.Thread | None = None
         self._stop_event      = threading.Event()
 
-        # Latest computed data — readable from outside
-        self.latest_df: pd.DataFrame = pd.DataFrame()
-        self.last_error: str         = ""
-        self.last_signal: str        = "HOLD"
-        self.last_exit_reason: str   = ""
+        # ── NumPy ring buffer (fixed size, pre-allocated) ──────────────────
+        self._opens      = np.zeros(candle_count, dtype=np.float64)
+        self._highs      = np.zeros(candle_count, dtype=np.float64)
+        self._lows       = np.zeros(candle_count, dtype=np.float64)
+        self._closes     = np.zeros(candle_count, dtype=np.float64)
+        self._volumes    = np.zeros(candle_count, dtype=np.float64)
+        self._timestamps = np.empty(candle_count, dtype="datetime64[s]")
 
-    # ── State machine ─────────────────────────────────────────────────────────
+        self._buffer_ready   = False
+        self._last_candle_ts = None   # timestamp of last processed candle
+
+        # Latest computed state — readable from status()
+        self.latest_df:        pd.DataFrame = pd.DataFrame()
+        self.last_error:       str          = ""
+        self.last_signal:      str          = "HOLD"
+        self.last_exit_reason: str          = ""
+
+    # ── State machine ──────────────────────────────────────────────────────────
 
     def start(self) -> None:
         if self.state == EngineState.RUNNING:
@@ -82,7 +103,7 @@ class TradingEngine:
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
         self.state = EngineState.RUNNING
-        log.info("Engine RUNNING — %s %s every %.1fs", self.symbol, self.interval, self.poll_interval)
+        log.info("Engine RUNNING — %s %s", self.symbol, self.interval)
 
     def pause(self) -> None:
         if self.state == EngineState.RUNNING:
@@ -99,38 +120,37 @@ class TradingEngine:
         self.state = EngineState.STOPPED
         log.info("Engine STOPPED")
 
-    # ── Polling loop ─────────────────────────────────────────────────────────
+    # ── Main loop ──────────────────────────────────────────────────────────────
 
     def _loop(self) -> None:
-        """Main polling loop — runs in background thread."""
         log.info("Poll loop started for %s [%s]", self.symbol, self.interval)
 
+        # Warmup once — fetch full history, fill buffer, compute indicators
+        self._warmup()
+
+        # Poll every CHECK_INTERVAL seconds for new candle
         while not self._stop_event.is_set():
-
             if self.state == EngineState.PAUSED:
-                time.sleep(self.poll_interval)
+                time.sleep(_CHECK_INTERVAL)
                 continue
-
             try:
                 self._tick()
             except Exception as exc:
                 self.last_error = str(exc)
                 log.error("Engine tick error: %s", exc)
-
-            time.sleep(self.poll_interval)
+            time.sleep(_CHECK_INTERVAL)
 
         log.info("Poll loop exited for %s", self.symbol)
 
-    def _tick(self) -> None:
+    # ── Warmup — fetch full history once ──────────────────────────────────────
+
+    def _warmup(self) -> None:
         """
-        One poll cycle:
-          1. Fetch latest candles
-          2. Run Supertrend + ATR indicators
-          3. Generate entry signal
-          4. If no position — check for BUY
-          5. If in position — update peak, check exits, place SELL if triggered
+        Fetch candle_count candles once at startup.
+        Fill NumPy buffer → compute indicators → ready for polling.
         """
-        # Step 1 — fetch candles
+        log.info("[WARMUP] Fetching %d candles for %s [%s]...", self.candle_count, self.symbol, self.interval)
+
         df = self.broker.get_candles(
             instrument_token = self.instrument_token,
             interval         = self.interval,
@@ -138,49 +158,116 @@ class TradingEngine:
         )
 
         if df.empty:
-            log.warning("Empty candle data for %s", self.symbol)
+            log.error("[WARMUP] No candle data — engine cannot start")
+            self.stop()
             return
 
-        # Step 2 — indicators
+        # Fill buffer from DataFrame
+        self._fill_buffer(df)
+
+        # Build DataFrame from buffer + compute indicators
+        df = self._to_dataframe()
         if settings.use_supertrend:
             df = calculate_supertrend(df)
-
         if settings.use_atr:
             df = calculate_atr(df)
 
-        self.latest_df = df
+        self.latest_df       = df
+        self._last_candle_ts = self._timestamps[-1]
+        self._buffer_ready   = True
 
-        # Extract last row values
+        last      = df.iloc[-1]
+        close     = float(last["close"])
+        st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else float("nan")
+        atr_val   = round(float(last.get("atr", 0.0)), 2) if "atr" in df.columns else None
+        direction = "GREEN" if int(last.get("st_direction", 0)) == 1 else "RED"
+
+        log.info(
+            "[WARMUP] Done — %d candles | close=%.2f | ST=%.2f (%s) | ATR=%s",
+            len(df), close, st_val, direction, atr_val,
+        )
+
+    # ── Tick — check for new candle, act only on close ────────────────────────
+
+    def _tick(self) -> None:
+        """
+        Fetch 3 latest candles (cheap).
+        If new candle closed → roll NumPy buffer → recalculate indicators → check signal/exit.
+        Always emit tick event with latest known data.
+        """
+        if not self._buffer_ready:
+            return
+
+        # Fetch only 3 candles — lightweight API call
+        recent = self.broker.get_candles(
+            instrument_token = self.instrument_token,
+            interval         = self.interval,
+            candle_count     = 3,
+        )
+
+        if recent.empty:
+            return
+
+        latest_ts  = recent.index[-1].to_datetime64().astype("datetime64[s]")
+        latest_row = recent.iloc[-1]
+        new_candle = (latest_ts != self._last_candle_ts)
+
+        if new_candle:
+            # Roll buffer left by 1 → insert new candle at end
+            np.roll(self._opens,   -1, out=self._opens);   self._opens[-1]   = float(latest_row["open"])
+            np.roll(self._highs,   -1, out=self._highs);   self._highs[-1]   = float(latest_row["high"])
+            np.roll(self._lows,    -1, out=self._lows);    self._lows[-1]    = float(latest_row["low"])
+            np.roll(self._closes,  -1, out=self._closes);  self._closes[-1]  = float(latest_row["close"])
+            np.roll(self._volumes, -1, out=self._volumes); self._volumes[-1] = float(latest_row["volume"])
+            np.roll(self._timestamps, -1, out=self._timestamps); self._timestamps[-1] = latest_ts
+
+            self._last_candle_ts = latest_ts
+
+            # Rebuild DataFrame + recalculate indicators on updated buffer
+            df = self._to_dataframe()
+            if settings.use_supertrend:
+                df = calculate_supertrend(df)
+            if settings.use_atr:
+                df = calculate_atr(df)
+
+            self.latest_df = df
+
+        else:
+            df = self.latest_df
+            if df.empty:
+                return
+
+        # Extract latest values
         last      = df.iloc[-1]
         ts        = df.index[-1].strftime("%H:%M:%S")
         close     = float(last["close"])
-        st_dir    = int(last.get("st_direction", 0))   if "st_direction" in df.columns else 0
+        st_dir    = int(last.get("st_direction", 0))    if "st_direction" in df.columns else 0
         st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else float("nan")
-        atr_val   = float(last.get("atr", 0.0))        if "atr"          in df.columns else None
+        atr_val   = float(last.get("atr", 0.0))         if "atr"          in df.columns else None
         direction = "GREEN" if st_dir == 1 else "RED" if st_dir == -1 else "?"
 
         log.info(
-            "[%s] %s | close=%.2f | ST=%.2f (%s) | ATR=%s",
+            "[%s] %s | close=%.2f | ST=%.2f (%s) | ATR=%s%s",
             ts, self.symbol, close, st_val, direction,
             round(atr_val, 2) if atr_val else "-",
+            " [NEW CANDLE]" if new_candle else "",
         )
 
-        # Emit tick to frontend
         emit_sync("tick", {
-            "timestamp":   ts,
-            "symbol":      self.symbol,
-            "close":       close,
-            "supertrend":  st_val,
-            "atr":         round(atr_val, 2) if atr_val else None,
-            "direction":   direction,
+            "timestamp":  ts,
+            "symbol":     self.symbol,
+            "close":      close,
+            "supertrend": st_val,
+            "atr":        round(atr_val, 2) if atr_val else None,
+            "direction":  direction,
+            "new_candle": new_candle,
         })
 
-        # Step 3 — need at least 2 rows for signal
-        if len(df) < 2:
+        # Signal + exit logic only on confirmed candle close
+        if not new_candle or len(df) < 2:
             return
 
-        # Step 4 — check for entry (no open position)
-        positions = self.broker.get_positions()
+        positions   = self.broker.get_positions()
         in_position = bool(positions)
 
         if not in_position:
@@ -188,67 +275,51 @@ class TradingEngine:
             self.last_signal = signal
 
             if signal == "BUY":
-                log.info("[ENGINE] BUY signal — placing order for %s qty=%d", self.symbol, self.qty)
-                emit_sync("signal:buy", {
-                    "symbol": self.symbol,
-                    "price":  close,
-                    "time":   ts,
-                })
+                log.info("[ENGINE] BUY signal — %s qty=%d @ %.2f", self.symbol, self.qty, close)
+                emit_sync("signal:buy", {"symbol": self.symbol, "price": close, "time": ts})
                 order_id = self.broker.place_order(
-                    symbol           = self.symbol,
-                    token            = self.instrument_token,
-                    qty              = self.qty,
-                    transaction_type = "BUY",
-                    product          = "MIS",
-                    order_type       = "MARKET",
+                    symbol=self.symbol, token=self.instrument_token,
+                    qty=self.qty, transaction_type="BUY",
+                    product="MIS", order_type="MARKET",
                 )
                 emit_sync("order:placed", {
-                    "type":     "BUY",
-                    "symbol":   self.symbol,
-                    "qty":      self.qty,
-                    "price":    close,
-                    "order_id": order_id,
+                    "type": "BUY", "symbol": self.symbol,
+                    "qty": self.qty, "price": close, "order_id": order_id,
                 })
 
-        # Step 5 — manage open position
         else:
             position = positions[0]
 
-            # Update trailing SL peak (ForwardTestBroker has this; real broker tracks via Kite)
             if hasattr(self.broker, "update_peak_price"):
                 self.broker.update_peak_price(close)
 
-            # Emit live position update to frontend
             emit_sync("position:update", {
-                "symbol":          position.get("symbol", self.symbol),
-                "entry_price":     position.get("entry_price", 0),
-                "current_price":   close,
-                "peak_price":      position.get("peak_price", 0),
-                "unrealized_pnl":  round((close - position.get("entry_price", close)) * position.get("qty", self.qty), 2),
+                "symbol":         position.get("symbol", self.symbol),
+                "entry_price":    position.get("entry_price", 0),
+                "current_price":  close,
+                "peak_price":     position.get("peak_price", 0),
+                "unrealized_pnl": round(
+                    (close - position.get("entry_price", close)) * position.get("qty", self.qty), 2
+                ),
             })
 
-            # Sync peak_price for exit_manager (real broker positions won't have this key)
             if "peak_price" not in position:
                 position["peak_price"] = position.get("entry_price", close)
 
             exit_reason = exit_manager.check(
-                position      = position,
-                current_price = close,
-                st_direction  = st_dir,
-                atr_value     = atr_val,
+                position=position, current_price=close,
+                st_direction=st_dir, atr_value=atr_val,
             )
 
             if exit_reason != exit_manager.HOLD:
                 summary = exit_manager.exit_summary(exit_reason, position, close)
                 log.info(
                     "[ENGINE] EXIT — reason=%s | entry=%.2f | exit=%.2f | P&L=%.2f (%s)",
-                    exit_reason,
-                    summary["entry_price"],
-                    summary["exit_price"],
-                    summary["pnl_points"],
-                    summary["result"],
+                    exit_reason, summary["entry_price"], summary["exit_price"],
+                    summary["pnl_points"], summary["result"],
                 )
                 self.last_exit_reason = exit_reason
+
                 emit_sync("exit:triggered", {
                     "reason":      exit_reason,
                     "entry_price": summary["entry_price"],
@@ -259,22 +330,16 @@ class TradingEngine:
                 })
 
                 order_id = self.broker.place_order(
-                    symbol           = self.symbol,
-                    token            = self.instrument_token,
-                    qty              = position.get("qty", self.qty),
-                    transaction_type = "SELL",
-                    product          = "MIS",
-                    order_type       = "MARKET",
+                    symbol=self.symbol, token=self.instrument_token,
+                    qty=position.get("qty", self.qty), transaction_type="SELL",
+                    product="MIS", order_type="MARKET",
                 )
                 emit_sync("order:placed", {
-                    "type":     "SELL",
-                    "symbol":   self.symbol,
-                    "qty":      position.get("qty", self.qty),
-                    "price":    close,
-                    "order_id": order_id,
+                    "type": "SELL", "symbol": self.symbol,
+                    "qty": position.get("qty", self.qty),
+                    "price": close, "order_id": order_id,
                 })
 
-                # Persist completed trade to DB
                 save_trade_sync({
                     "symbol":           self.symbol,
                     "instrument_token": self.instrument_token,
@@ -288,13 +353,37 @@ class TradingEngine:
                     "broker_mode":      settings.broker_mode,
                     "interval":         self.interval,
                     "entry_time":       position.get("entry_time"),
-                    "exit_time":        None,   # defaults to now() in save_trade
+                    "exit_time":        None,
                 })
 
-    # ── Status ────────────────────────────────────────────────────────────────
+    # ── Buffer helpers ─────────────────────────────────────────────────────────
+
+    def _fill_buffer(self, df: pd.DataFrame) -> None:
+        """Load DataFrame into NumPy arrays (called once at warmup)."""
+        n = min(len(df), self.candle_count)
+        self._opens[-n:]      = df["open"].values[-n:].astype(np.float64)
+        self._highs[-n:]      = df["high"].values[-n:].astype(np.float64)
+        self._lows[-n:]       = df["low"].values[-n:].astype(np.float64)
+        self._closes[-n:]     = df["close"].values[-n:].astype(np.float64)
+        self._volumes[-n:]    = df["volume"].values[-n:].astype(np.float64)
+        self._timestamps[-n:] = df.index[-n:].values.astype("datetime64[s]")
+
+    def _to_dataframe(self) -> pd.DataFrame:
+        """Convert NumPy buffer to DataFrame for indicator calculation."""
+        return pd.DataFrame(
+            {
+                "open":   self._opens,
+                "high":   self._highs,
+                "low":    self._lows,
+                "close":  self._closes,
+                "volume": self._volumes,
+            },
+            index=pd.to_datetime(self._timestamps),
+        )
+
+    # ── Status ─────────────────────────────────────────────────────────────────
 
     def status(self) -> dict:
-        """Return current engine state and latest indicator values."""
         result = {
             "state":    self.state.value,
             "symbol":   self.symbol,
@@ -304,11 +393,11 @@ class TradingEngine:
         if not self.latest_df.empty:
             last = self.latest_df.iloc[-1]
             result.update({
-                "timestamp":   self.latest_df.index[-1].strftime("%Y-%m-%d %H:%M:%S"),
-                "close":       round(last["close"], 2),
-                "supertrend":  round(last.get("supertrend",   float("nan")), 2) if "supertrend"   in self.latest_df.columns else None,
-                "st_direction": int(last.get("st_direction", 0))                if "st_direction" in self.latest_df.columns else None,
-                "atr":         round(last.get("atr",          float("nan")), 2) if "atr"          in self.latest_df.columns else None,
+                "timestamp":    self.latest_df.index[-1].strftime("%Y-%m-%d %H:%M:%S"),
+                "close":        round(last["close"], 2),
+                "supertrend":   round(float(last.get("supertrend", float("nan"))), 2) if "supertrend"   in self.latest_df.columns else None,
+                "st_direction": int(last.get("st_direction", 0))                      if "st_direction" in self.latest_df.columns else None,
+                "atr":          round(float(last.get("atr", float("nan"))), 2)        if "atr"          in self.latest_df.columns else None,
             })
 
         result["last_signal"]      = self.last_signal

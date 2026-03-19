@@ -65,17 +65,18 @@ class ZerodhaBroker(BrokerABC):
         to_date   = datetime.now()
         from_date = to_date - timedelta(days=days)
 
+        from_str = from_date.strftime("%Y-%m-%d %H:%M:%S")
+        to_str   = to_date.strftime("%Y-%m-%d %H:%M:%S")
+
         log.info(
             "Fetching candles: token=%s interval=%s from=%s to=%s",
-            instrument_token, interval,
-            from_date.strftime("%Y-%m-%d"),
-            to_date.strftime("%Y-%m-%d"),
+            instrument_token, interval, from_str, to_str,
         )
 
         raw = self.kite.historical_data(
             instrument_token = instrument_token,
-            from_date        = from_date,
-            to_date          = to_date,
+            from_date        = from_str,
+            to_date          = to_str,
             interval         = interval,
             continuous       = False,
             oi               = False,

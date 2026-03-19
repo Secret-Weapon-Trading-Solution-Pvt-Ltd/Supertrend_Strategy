@@ -493,8 +493,10 @@ _ind_tasks: dict[str, asyncio.Task] = {}   # sid → asyncio.Task
 
 async def _indicators_loop(sid: str, token: int, interval: str) -> None:
     """
-    Background coroutine per subscriber.
-    Fetches candles every 1s, calculates Supertrend + ATR, emits indicators:data.
+    Warmup: fetch 100 candles once → calculate ST/ATR → cache state.
+    Poll:   every 1s fetch 3 latest candles → compare timestamp →
+            if new candle → recalculate ST/ATR → emit.
+            Always emit current close from the latest tick.
     """
     from broker.zerodha import ZerodhaBroker
     from strategy.indicators import calculate_supertrend, calculate_atr
@@ -505,27 +507,99 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
 
     log.info("indicators:loop START — sid=%s token=%d interval=%s", sid, token, interval)
 
+    # Cached indicator state — only recalculated on new candle close
+    st_val    = None
+    atr_val   = None
+    direction = "?"
+    last_candle_ts = None
+    base_df   = None   # initialized here so poll loop can safely check `base_df is not None`
+
+    # ── WARMUP — fetch 100 candles once ──────────────────────────────────────
+    try:
+        df = await asyncio.to_thread(
+            broker.get_candles,
+            instrument_token=token,
+            interval=interval,
+            candle_count=100,
+        )
+        if not df.empty:
+            base_df = df   # store raw candles as base for forming-candle updates
+            if settings.use_supertrend:
+                df = calculate_supertrend(df)
+            if settings.use_atr:
+                df = calculate_atr(df)
+
+            last           = df.iloc[-1]
+            last_candle_ts = df.index[-1]
+            st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else None
+            atr_val   = round(float(last.get("atr", 0.0)), 2)                if "atr"        in df.columns else None
+            st_dir    = int(last.get("st_direction", 0))                      if "st_direction" in df.columns else 0
+            direction = "GREEN" if st_dir == 1 else "RED" if st_dir == -1 else "?"
+            log.info(
+                "indicators:warmup done — close=%.2f ST=%s ATR=%s dir=%s ts=%s",
+                float(last["close"]), st_val, atr_val, direction,
+                last_candle_ts.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+    except asyncio.CancelledError:
+        return
+    except Exception as exc:
+        log.error("indicators:warmup error: %s", exc)
+
+    # ── POLL — fetch 3 candles every 1s ──────────────────────────────────────
     while True:
         try:
-            df = broker.get_candles(
+            recent = await asyncio.to_thread(
+                broker.get_candles,
                 instrument_token=token,
                 interval=interval,
-                candle_count=100,
+                candle_count=3,
             )
 
-            if not df.empty:
-                if settings.use_supertrend:
-                    df = calculate_supertrend(df)
-                if settings.use_atr:
-                    df = calculate_atr(df)
+            if not recent.empty and base_df is not None:
+                current_ts = recent.index[-1]
+                latest_row = recent.iloc[-1]
+                close      = round(float(latest_row["close"]), 2)
+                new_candle = (last_candle_ts is not None and current_ts != last_candle_ts)
 
-                last      = df.iloc[-1]
-                close     = round(float(last["close"]), 2)
-                st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else None
-                atr_val   = round(float(last.get("atr", 0.0)), 2)                if "atr"        in df.columns else None
-                st_dir    = int(last.get("st_direction", 0))                      if "st_direction" in df.columns else 0
+                if new_candle:
+                    # New candle closed — fetch fresh 100 candles as new base
+                    log.info("indicators:new candle — %s", current_ts.strftime("%H:%M:%S"))
+                    fresh = await asyncio.to_thread(
+                        broker.get_candles,
+                        instrument_token=token,
+                        interval=interval,
+                        candle_count=100,
+                    )
+                    if not fresh.empty:
+                        base_df = fresh
+                    last_candle_ts = current_ts
+
+                # Always update last row of base_df with forming candle values
+                # so ST/ATR reflect the live forming candle every second
+                live_df = base_df.copy()
+                live_df.loc[current_ts, "open"]   = float(latest_row["open"])
+                live_df.loc[current_ts, "high"]   = float(latest_row["high"])
+                live_df.loc[current_ts, "low"]    = float(latest_row["low"])
+                live_df.loc[current_ts, "close"]  = float(latest_row["close"])
+                live_df.loc[current_ts, "volume"] = float(latest_row["volume"])
+
+                if settings.use_supertrend:
+                    live_df = calculate_supertrend(live_df)
+                if settings.use_atr:
+                    live_df = calculate_atr(live_df)
+
+                last      = live_df.iloc[-1]
+                st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in live_df.columns else None
+                atr_val   = round(float(last.get("atr", 0.0)), 2)                if "atr"        in live_df.columns else None
+                st_dir    = int(last.get("st_direction", 0))                      if "st_direction" in live_df.columns else 0
                 direction = "GREEN" if st_dir == 1 else "RED" if st_dir == -1 else "?"
-                ts        = df.index[-1].strftime("%H:%M:%S")
+                ts        = current_ts.strftime("%H:%M:%S")
+
+                log.info(
+                    "indicators:emit — sid=%s close=%.2f ST=%s ATR=%s dir=%s%s",
+                    sid, close, st_val, atr_val, direction,
+                    " [NEW CANDLE]" if new_candle else "",
+                )
 
                 await sio.emit("indicators:data", {
                     "timestamp":  ts,
@@ -533,6 +607,7 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
                     "supertrend": st_val,
                     "atr":        atr_val,
                     "direction":  direction,
+                    "new_candle": new_candle,
                 }, to=sid)
 
         except asyncio.CancelledError:

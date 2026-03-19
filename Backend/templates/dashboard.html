@@ -442,6 +442,73 @@
   /* card border accent by direction */
   .val-card.st-green { border-color: var(--green-bdr); }
   .val-card.st-red   { border-color: var(--red-bdr); }
+
+  /* live pulse dot on label */
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 5px;
+    animation: pulse 1.5s infinite;
+    vertical-align: middle;
+  }
+
+  /* flash on value update */
+  @keyframes flash {
+    0%   { color: var(--green); }
+    100% { color: var(--text); }
+  }
+  .val-num.flash { animation: flash 0.6s ease-out; }
+
+  /* ── Signals History ── */
+  .section-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text2); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .signals-table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .signals-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px;
+  }
+  .signals-table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text2);
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+  }
+  .signals-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--bg3);
+    color: var(--text);
+  }
+  .signals-table tr:last-child td { border-bottom: none; }
+  .signals-table tr:hover td { background: var(--bg3); }
+
+  .sig-result {
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block;
+  }
+  .sig-result.profit { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bdr); }
+  .sig-result.loss   { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-bdr); }
+
+  .sig-empty {
+    padding: 28px; text-align: center;
+    color: var(--text3); font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -564,46 +631,77 @@
   <!-- CONTENT -->
   <main class="content" id="mainContent">
 
-    <!-- Placeholder — hidden once engine starts -->
+    <!-- Placeholder -->
     <div class="content-placeholder" id="placeholder">
       <div class="ph-icon">📊</div>
       <div class="ph-title">Select a symbol and timeframe</div>
       <div class="ph-sub">Live Supertrend + ATR will appear automatically</div>
     </div>
 
-    <!-- Live Data Panel — shown once engine starts -->
-    <div class="live-panel" id="livePanel" style="display:none;">
+    <!-- Live section — shown once subscribed -->
+    <div id="liveSection" style="display:none;">
 
-      <!-- Header row -->
-      <div class="live-header">
-        <div class="live-symbol" id="liveSymbol">—</div>
-        <div class="live-interval" id="liveInterval">—</div>
-        <div class="live-ts" id="liveTs">—</div>
-        <div class="live-candle" id="liveCandle"></div>
+      <!-- Live values panel -->
+      <div class="live-panel" id="livePanel">
+
+        <!-- Header row -->
+        <div class="live-header">
+          <div class="live-symbol" id="liveSymbol">—</div>
+          <div class="live-interval" id="liveInterval">—</div>
+          <div class="live-ts" id="liveTs">—</div>
+          <div class="live-candle" id="liveCandle"></div>
+        </div>
+
+        <!-- Value cards -->
+        <div class="val-grid" id="valGrid">
+
+          <!-- Close price -->
+          <div class="val-card">
+            <div class="val-label"><span class="live-dot"></span>Live Price</div>
+            <div class="val-num" id="valClose">—</div>
+          </div>
+
+          <!-- Supertrend card -->
+          <div class="val-card" id="cardST" style="display:none;">
+            <div class="val-label"><span class="live-dot"></span>Supertrend</div>
+            <div class="val-num" id="valST">—</div>
+            <div class="val-dir" id="valDir">—</div>
+          </div>
+
+          <!-- ATR card -->
+          <div class="val-card" id="cardATR" style="display:none;">
+            <div class="val-label"><span class="live-dot"></span>ATR</div>
+            <div class="val-num" id="valATR">—</div>
+          </div>
+
+        </div>
       </div>
 
-      <!-- Value cards -->
-      <div class="val-grid" id="valGrid">
-
-        <!-- Close price — always shown -->
-        <div class="val-card">
-          <div class="val-label">Last Price</div>
-          <div class="val-num" id="valClose">—</div>
+      <!-- Signals history -->
+      <div>
+        <div class="section-title">
+          📋 Previous Signals
+          <button id="btnRefreshSignals" style="margin-left:auto;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;">↻ Refresh</button>
         </div>
-
-        <!-- Supertrend card -->
-        <div class="val-card" id="cardST" style="display:none;">
-          <div class="val-label">Supertrend</div>
-          <div class="val-num" id="valST">—</div>
-          <div class="val-dir" id="valDir">—</div>
+        <div class="signals-table-wrap">
+          <table class="signals-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>P&amp;L pts</th>
+                <th>P&amp;L ₹</th>
+                <th>Result</th>
+                <th>Reason</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="signalsBody">
+              <tr><td colspan="8" class="sig-empty">No signals yet</td></tr>
+            </tbody>
+          </table>
         </div>
-
-        <!-- ATR card -->
-        <div class="val-card" id="cardATR" style="display:none;">
-          <div class="val-label">ATR</div>
-          <div class="val-num" id="valATR">—</div>
-        </div>
-
       </div>
 
     </div>
@@ -640,7 +738,6 @@ const selInfo      = document.getElementById('selInfo');
 const selToken     = document.getElementById('selToken');
 const symClearBtn  = document.getElementById('symClearBtn');
 const tfSelect     = document.getElementById('tfSelect');
-const engineToast  = document.getElementById('engineToast');
 
 // ══════════════════════════════════════
 //  LOGIN CHECK
@@ -683,6 +780,7 @@ async function loadTimeframes() {
 
 tfSelect.addEventListener('change', () => {
   APP.interval = tfSelect.value;
+  console.log('[tfSelect] interval set →', APP.interval);
   trySubscribe();
 });
 
@@ -745,6 +843,7 @@ function renderDropdown(items) {
 
 function selectSymbol(inst) {
   APP.symbol        = inst;
+  console.log('[selectSymbol] symbol set →', inst);
   selTicker.textContent = inst.symbol;
   selInfo.textContent   = inst.name || '—';
   selToken.textContent  = `Token: ${inst.token}  ·  ${inst.exchange}`;
@@ -777,20 +876,21 @@ function closeDropdown() {
 //  No engine start needed — just live ST/ATR stream.
 // ══════════════════════════════════════
 function trySubscribe() {
-  if (!APP.socket || !APP.symbol || !APP.interval) return;
-  APP.socket.emit('indicators:subscribe', {
-    token:    APP.symbol.token,
-    interval: APP.interval,
-  });
+  console.log('[trySubscribe] socket:', !!APP.socket, '| symbol:', APP.symbol, '| interval:', APP.interval);
+  if (!APP.socket || !APP.symbol || !APP.interval) {
+    console.warn('[trySubscribe] BLOCKED — missing:', !APP.socket ? 'socket' : !APP.symbol ? 'symbol' : 'interval');
+    return;
+  }
+  const payload = { token: APP.symbol.token, interval: APP.interval };
+  console.log('[trySubscribe] EMITTING indicators:subscribe →', payload);
+  APP.socket.emit('indicators:subscribe', payload);
   showLivePanel(APP.symbol.symbol, APP.interval);
   cardST.style.display  = toggleST.checked  ? 'block' : 'none';
   cardATR.style.display = toggleATR.checked ? 'block' : 'none';
 }
 
 function showToast(msg) {
-  engineToast.textContent = msg;
-  engineToast.classList.add('show');
-  setTimeout(() => engineToast.classList.remove('show'), 4000);
+  console.warn('SWTS error:', msg);
 }
 
 // ══════════════════════════════════════
@@ -811,17 +911,26 @@ function setWs(connected) {
 const sioScript  = document.createElement('script');
 sioScript.src    = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
 sioScript.onload = () => {
+  console.log('[socket.io] script loaded, connecting to http://localhost:8000...');
   const socket = io('http://localhost:8000', {
     transports: ['websocket', 'polling'],
   });
   APP.socket = socket;
+  console.log('[socket.io] socket object created:', socket);
 
-  socket.on('connect',       () => setWs(true));
+  socket.on('connect', () => {
+    console.log('[socket] CONNECTED — sid:', socket.id, '| transport:', socket.io.engine.transport.name);
+    setWs(true);
+    trySubscribe();
+  });
   socket.on('disconnect',    () => setWs(false));
   socket.on('connect_error', err => console.error('Socket.IO error:', err.message));
 
   // Live indicator stream — fires every 1s as soon as symbol+timeframe selected
-  socket.on('indicators:data', data => onTick(data));
+  socket.on('indicators:data', data => {
+    console.log('[indicators:data] received →', data);
+    onTick(data);
+  });
 
   socket.on('tick',  data => onTick(data));
   socket.on('error', data => showToast(data.message || 'Unknown error'));
@@ -866,72 +975,117 @@ indSTRow.classList.add('active');
 indATRRow.classList.add('active');
 
 // ══════════════════════════════════════
-//  LIVE PANEL
+//  LIVE PANEL + SIGNALS HISTORY
 // ══════════════════════════════════════
-const placeholder = document.getElementById('placeholder');
-const livePanel   = document.getElementById('livePanel');
-const liveSymbol  = document.getElementById('liveSymbol');
-const liveInterval = document.getElementById('liveInterval');
-const liveTs      = document.getElementById('liveTs');
-const liveCandle  = document.getElementById('liveCandle');
-const valClose    = document.getElementById('valClose');
-const valST       = document.getElementById('valST');
-const valDir      = document.getElementById('valDir');
-const valATR      = document.getElementById('valATR');
+const placeholder   = document.getElementById('placeholder');
+const liveSection   = document.getElementById('liveSection');
+const liveSymbol    = document.getElementById('liveSymbol');
+const liveInterval  = document.getElementById('liveInterval');
+const liveTs        = document.getElementById('liveTs');
+const liveCandle    = document.getElementById('liveCandle');
+const valClose      = document.getElementById('valClose');
+const valST         = document.getElementById('valST');
+const valDir        = document.getElementById('valDir');
+const valATR        = document.getElementById('valATR');
+const signalsBody   = document.getElementById('signalsBody');
 
 function showLivePanel(symbol, interval) {
-  placeholder.style.display = 'none';
-  livePanel.style.display   = 'flex';
-  liveSymbol.textContent    = symbol;
-  liveInterval.textContent  = interval;
+  placeholder.style.display  = 'none';
+  liveSection.style.display  = 'block';
+  liveSymbol.textContent     = symbol;
+  liveInterval.textContent   = interval;
+  loadSignals();
 }
 
 function hideLivePanel() {
   placeholder.style.display = 'flex';
-  livePanel.style.display   = 'none';
+  liveSection.style.display = 'none';
+}
+
+function flashNum(el) {
+  el.classList.remove('flash');
+  void el.offsetWidth;   // reflow to restart animation
+  el.classList.add('flash');
 }
 
 function onTick(data) {
-  // timestamp
   liveTs.textContent = data.timestamp || '—';
 
-  // new candle indicator
   if (data.new_candle) {
-    liveCandle.textContent  = '● NEW CANDLE';
-    liveCandle.className    = 'live-candle new';
+    liveCandle.textContent = '● NEW CANDLE';
+    liveCandle.className   = 'live-candle new';
     setTimeout(() => { liveCandle.textContent = ''; liveCandle.className = 'live-candle'; }, 3000);
   }
 
-  // close price
-  valClose.textContent = data.close != null ? data.close.toFixed(2) : '—';
+  // Live price — always flash to show it's updating
+  const closeStr = data.close != null ? data.close.toFixed(2) : '—';
+  if (valClose.textContent !== closeStr) {
+    valClose.textContent = closeStr;
+    flashNum(valClose);
+  }
 
-  // supertrend
+  // Supertrend
   if (toggleST.checked) {
-    const stVal = data.supertrend;
+    const stVal   = data.supertrend;
     const isValid = stVal != null && !isNaN(stVal);
-    valST.textContent = isValid ? stVal.toFixed(2) : '—';
-
+    const stStr   = isValid ? stVal.toFixed(2) : '—';
+    if (valST.textContent !== stStr) {
+      valST.textContent = stStr;
+      flashNum(valST);
+    }
     const dir = data.direction || '';
     if (dir === 'GREEN') {
-      valDir.textContent  = '▲ BULLISH';
-      valDir.className    = 'val-dir green';
-      cardST.className    = 'val-card st-green';
+      valDir.textContent = '▲ BULLISH'; valDir.className = 'val-dir green'; cardST.className = 'val-card st-green';
     } else if (dir === 'RED') {
-      valDir.textContent  = '▼ BEARISH';
-      valDir.className    = 'val-dir red';
-      cardST.className    = 'val-card st-red';
+      valDir.textContent = '▼ BEARISH'; valDir.className = 'val-dir red';   cardST.className = 'val-card st-red';
     } else {
-      valDir.textContent  = '—';
-      valDir.className    = 'val-dir';
-      cardST.className    = 'val-card';
+      valDir.textContent = '—';         valDir.className = 'val-dir';       cardST.className = 'val-card';
     }
   }
 
   // ATR
   if (toggleATR.checked) {
-    valATR.textContent = data.atr != null ? data.atr.toFixed(2) : '—';
+    const atrStr = data.atr != null ? data.atr.toFixed(2) : '—';
+    if (valATR.textContent !== atrStr) {
+      valATR.textContent = atrStr;
+      flashNum(valATR);
+    }
   }
 }
+
+// ── Signals history ────────────────────────────────────────────────────────
+async function loadSignals() {
+  try {
+    const res    = await fetch('/api/trades?limit=50');
+    const trades = await res.json();
+
+    if (!trades.length) {
+      signalsBody.innerHTML = `<tr><td colspan="8" class="sig-empty">No signals yet</td></tr>`;
+      return;
+    }
+
+    signalsBody.innerHTML = trades.map(t => {
+      const pnlCls  = t.result === 'PROFIT' ? 'profit' : 'loss';
+      const pnlSign = t.pnl_amount > 0 ? '+' : '';
+      const time    = t.exit_time ? t.exit_time.replace('T', ' ').slice(0, 16) : '—';
+      return `
+        <tr>
+          <td><strong>${t.symbol}</strong></td>
+          <td>${t.entry_price.toFixed(2)}</td>
+          <td>${t.exit_price.toFixed(2)}</td>
+          <td>${t.pnl_points > 0 ? '+' : ''}${t.pnl_points.toFixed(2)}</td>
+          <td>${pnlSign}${t.pnl_amount.toFixed(2)}</td>
+          <td><span class="sig-result ${pnlCls}">${t.result}</span></td>
+          <td>${t.exit_reason}</td>
+          <td style="color:var(--text2);font-family:monospace;">${time}</td>
+        </tr>`;
+    }).join('');
+  } catch {
+    signalsBody.innerHTML = `<tr><td colspan="8" class="sig-empty">Failed to load signals</td></tr>`;
+  }
+}
+
+document.getElementById('btnRefreshSignals').addEventListener('click', loadSignals);
 
 // ══════════════════════════════════════
 //  INIT

@@ -199,6 +199,11 @@ fastapi_app.include_router(trades_router)
 
 # ── OAuth login routes ────────────────────────────────────────────────────────
 
+@fastapi_app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
 @fastapi_app.get("/", response_class=HTMLResponse)
 async def index(request: Request, request_token: str | None = None, status: str | None = None):
     global _access_token
@@ -352,11 +357,6 @@ async def connect(sid, environ):
         await sio.emit("engine:state", _engine.status(), to=sid)
 
 
-@sio.event
-async def disconnect(sid):
-    log.info("Socket.IO client disconnected: %s", sid)
-
-
 @sio.on("engine:start")
 async def on_engine_start(sid, data: dict):
     """
@@ -484,6 +484,105 @@ async def on_mode_switch(sid, data: dict):
     await emit("mode:state", {"mode": mode})
 
 
+# ── Indicators subscription (lightweight — no engine, no orders) ──────────────
+# Each connected client can subscribe to live indicator updates for any symbol.
+# Backend fetches candles + calculates ST/ATR every 1s and emits indicators:data.
+
+_ind_tasks: dict[str, asyncio.Task] = {}   # sid → asyncio.Task
+
+
+async def _indicators_loop(sid: str, token: int, interval: str) -> None:
+    """
+    Background coroutine per subscriber.
+    Fetches candles every 1s, calculates Supertrend + ATR, emits indicators:data.
+    """
+    from broker.zerodha import ZerodhaBroker
+    from strategy.indicators import calculate_supertrend, calculate_atr
+
+    broker = ZerodhaBroker()
+    if _access_token:
+        broker.set_access_token(_access_token)
+
+    log.info("indicators:loop START — sid=%s token=%d interval=%s", sid, token, interval)
+
+    while True:
+        try:
+            df = broker.get_candles(
+                instrument_token=token,
+                interval=interval,
+                candle_count=100,
+            )
+
+            if not df.empty:
+                if settings.use_supertrend:
+                    df = calculate_supertrend(df)
+                if settings.use_atr:
+                    df = calculate_atr(df)
+
+                last      = df.iloc[-1]
+                close     = round(float(last["close"]), 2)
+                st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else None
+                atr_val   = round(float(last.get("atr", 0.0)), 2)                if "atr"        in df.columns else None
+                st_dir    = int(last.get("st_direction", 0))                      if "st_direction" in df.columns else 0
+                direction = "GREEN" if st_dir == 1 else "RED" if st_dir == -1 else "?"
+                ts        = df.index[-1].strftime("%H:%M:%S")
+
+                await sio.emit("indicators:data", {
+                    "timestamp":  ts,
+                    "close":      close,
+                    "supertrend": st_val,
+                    "atr":        atr_val,
+                    "direction":  direction,
+                }, to=sid)
+
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            log.error("indicators:loop error: %s", exc)
+
+        await asyncio.sleep(1)
+
+    log.info("indicators:loop STOP — sid=%s", sid)
+
+
+@sio.on("indicators:subscribe")
+async def on_indicators_subscribe(sid: str, data: dict) -> None:
+    """
+    Client sends {token, interval} → start live indicator stream for that sid.
+    """
+    token    = int(data.get("token", 0))
+    interval = data.get("interval", settings.timeframe)
+
+    if not token:
+        await sio.emit("error", {"message": "indicators:subscribe — token required"}, to=sid)
+        return
+
+    # Cancel existing task for this sid if any
+    if sid in _ind_tasks:
+        _ind_tasks[sid].cancel()
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(_indicators_loop(sid, token, interval))
+    _ind_tasks[sid] = task
+    log.info("indicators:subscribe — sid=%s token=%d interval=%s", sid, token, interval)
+
+
+@sio.on("indicators:unsubscribe")
+async def on_indicators_unsubscribe(sid: str, data: dict) -> None:
+    """Cancel the indicator stream for this client."""
+    if sid in _ind_tasks:
+        _ind_tasks[sid].cancel()
+        del _ind_tasks[sid]
+    log.info("indicators:unsubscribe — sid=%s", sid)
+
+
+@sio.event
+async def disconnect(sid):  # noqa: F811 — override the one above
+    log.info("Socket.IO client disconnected: %s", sid)
+    # Clean up indicator task if client disconnects
+    if sid in _ind_tasks:
+        _ind_tasks[sid].cancel()
+        del _ind_tasks[sid]
 
 
 # ── ASGI app — wraps FastAPI with Socket.IO ───────────────────────────────────

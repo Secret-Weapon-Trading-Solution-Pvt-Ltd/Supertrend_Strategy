@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWTS — Dashboard</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:         #0d1117;
+    --bg2:        #161b22;
+    --bg3:        #21262d;
+    --bg4:        #2d333b;
+    --border:     #30363d;
+    --text:       #e6edf3;
+    --text2:      #8b949e;
+    --text3:      #484f58;
+    --green:      #3fb950;
+    --green-bg:   rgba(63,185,80,0.1);
+    --green-bdr:  rgba(63,185,80,0.3);
+    --red:        #f85149;
+    --red-bg:     rgba(248,81,73,0.08);
+    --red-bdr:    rgba(248,81,73,0.3);
+    --blue:       #58a6ff;
+    --blue-bg:    rgba(88,166,255,0.1);
+    --blue-bdr:   rgba(88,166,255,0.3);
+    --orange:     #e3b341;
+    --orange-bg:  rgba(227,179,65,0.1);
+    --orange-bdr: rgba(227,179,65,0.3);
+    --purple:     #bc8cff;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  /* ══════════════════════════════════════
+     LOGIN OVERLAY
+  ══════════════════════════════════════ */
+  .login-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(13,17,23,0.96);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .login-overlay.show { display: flex; }
+
+  .login-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px 40px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  }
+  .login-card .lc-icon  { font-size: 40px; margin-bottom: 16px; }
+  .login-card .lc-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .login-card .lc-sub   { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+  .login-card .lc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    background: linear-gradient(135deg, #238636, #1a7f37);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+  .login-card .lc-btn:hover { opacity: 0.85; }
+
+  /* ══════════════════════════════════════
+     TOP BAR
+  ══════════════════════════════════════ */
+  .topbar {
+    height: 52px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #238636, #1a7f37);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .brand-name { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; }
+  .brand-sep  { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .brand-sub  { font-size: 11px; color: var(--text2); letter-spacing: 1px; }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  /* user chip */
+  .user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .user-chip .uc-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* ws badge */
+  .ws-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    border: 1px solid var(--border);
+    background: var(--bg3); color: var(--text2);
+    transition: all 0.3s; user-select: none;
+  }
+  .ws-badge.connected    { background: var(--green-bg); border-color: var(--green-bdr); color: var(--green); }
+  .ws-badge.disconnected { background: var(--red-bg);   border-color: var(--red-bdr);   color: var(--red); }
+  .ws-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .ws-dot.pulse { animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.4; transform:scale(0.7); }
+  }
+
+  /* ══════════════════════════════════════
+     LAYOUT
+  ══════════════════════════════════════ */
+  .layout {
+    display: flex;
+    height: calc(100vh - 52px);
+    margin-top: 52px;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 300px;
+    min-width: 300px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .sb-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sb-label {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text2); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ── Symbol Search ── */
+  .sym-search-wrap { position: relative; }
+  .sym-search-row  { display: flex; gap: 6px; }
+  .sym-input-wrap  { position: relative; flex: 1; }
+
+  .sym-icon {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text2); font-size: 13px; pointer-events: none;
+  }
+  .sym-input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px 9px 30px;
+    color: var(--text); font-size: 13px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .sym-input::placeholder { color: var(--text3); }
+  .sym-input:focus { border-color: var(--blue); }
+
+  .exch-select {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 8px;
+    color: var(--text); font-size: 12px;
+    outline: none; cursor: pointer; min-width: 68px;
+  }
+  .exch-select:focus { border-color: var(--blue); }
+
+  /* Dropdown */
+  .sym-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    z-index: 300; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    display: none; max-height: 260px; overflow-y: auto;
+  }
+  .sym-dropdown.open { display: block; }
+  .sym-dropdown::-webkit-scrollbar { width: 4px; }
+  .sym-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .drop-item {
+    display: grid; grid-template-columns: auto 1fr auto;
+    align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--bg3);
+    transition: background 0.12s;
+  }
+  .drop-item:last-child { border-bottom: none; }
+  .drop-item:hover { background: var(--bg3); }
+  .drop-sym  { font-size: 13px; font-weight: 700; color: var(--text); min-width: 80px; }
+  .drop-name { font-size: 11px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drop-exch {
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px;
+    background: var(--blue-bg); color: var(--blue);
+    border: 1px solid var(--blue-bdr); white-space: nowrap;
+  }
+  .drop-msg { padding: 14px; text-align: center; color: var(--text2); font-size: 12px; }
+
+  /* Selected symbol */
+  .sym-selected {
+    display: none; margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--green-bg); border: 1px solid var(--green-bdr);
+    border-radius: 8px; align-items: center; gap: 10px;
+  }
+  .sym-selected.show { display: flex; }
+  .sym-sel-ticker { font-size: 15px; font-weight: 700; color: var(--green); }
+  .sym-sel-info   { font-size: 11px; color: var(--text2); flex: 1; line-height: 1.5; }
+  .sym-sel-token  { font-size: 10px; color: var(--text3); font-family: monospace; }
+  .sym-clear-btn  {
+    background: none; border: none; color: var(--text2);
+    cursor: pointer; font-size: 15px; padding: 2px 4px;
+    border-radius: 4px; transition: color 0.15s; line-height: 1;
+  }
+  .sym-clear-btn:hover { color: var(--red); }
+
+  /* ── Timeframe Dropdown ── */
+  .tf-select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .tf-select:focus { border-color: var(--blue); }
+  .tf-select option { background: var(--bg3); color: var(--text); }
+
+  /* error toast */
+  .toast {
+    display: none;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--red-bg); border: 1px solid var(--red-bdr);
+    border-radius: 7px; font-size: 12px; color: var(--red);
+  }
+  .toast.show { display: block; }
+
+  /* ── RIGHT CONTENT ── */
+  .content {
+    flex: 1; overflow-y: auto;
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .content::-webkit-scrollbar { width: 6px; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .content-placeholder {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; color: var(--text3); text-align: center; min-height: 400px;
+  }
+  .content-placeholder .ph-icon  { font-size: 48px; opacity: 0.3; }
+  .content-placeholder .ph-title { font-size: 16px; color: var(--text2); }
+  .content-placeholder .ph-sub   { font-size: 13px; }
+
+  /* ── Indicator Toggles ── */
+  .ind-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .ind-row.active { border-color: var(--green-bdr); }
+
+  .ind-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ind-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .ind-desc { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+  .ind-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+  .ind-badge.enabled  { background: var(--green-bg);  color: var(--green); border: 1px solid var(--green-bdr); }
+  .ind-badge.disabled { background: var(--bg4);        color: var(--text3); border: 1px solid var(--border); }
+
+  /* Toggle switch */
+  .toggle-switch { position: relative; display: inline-block; cursor: pointer; }
+  .toggle-switch input { display: none; }
+
+  .toggle-track {
+    display: block;
+    width: 36px; height: 20px;
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: var(--text3);
+    border-radius: 50%;
+    transition: all 0.25s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--green); border-color: var(--green); }
+  .toggle-switch input:checked + .toggle-track .toggle-thumb { left: 18px; background: #fff; }
+
+  /* ── Live Panel ── */
+  .live-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .live-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .live-symbol   { font-size: 18px; font-weight: 700; color: var(--text); }
+  .live-interval {
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--blue-bg); color: var(--blue);
+    border: 1px solid var(--blue-bdr);
+  }
+  .live-ts     { font-size: 12px; color: var(--text2); margin-left: auto; font-family: monospace; }
+  .live-candle {
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .live-candle.new { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange-bdr); }
+
+  /* Value cards grid */
+  .val-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  .val-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.3s;
+  }
+
+  .val-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+  .val-num   { font-size: 32px; font-weight: 700; color: var(--text); font-family: monospace; letter-spacing: -1px; }
+
+  .val-dir {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+    letter-spacing: 0.5px;
+  }
+  .val-dir.green { background: var(--green-bg);  color: var(--green); border: 1px solid var(--green-bdr); }
+  .val-dir.red   { background: var(--red-bg);    color: var(--red);   border: 1px solid var(--red-bdr); }
+
+  /* card border accent by direction */
+  .val-card.st-green { border-color: var(--green-bdr); }
+  .val-card.st-red   { border-color: var(--red-bdr); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     LOGIN OVERLAY
+══════════════════════════════════════ -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="lc-icon">🔐</div>
+    <div class="lc-title">Not Connected to Zerodha</div>
+    <div class="lc-sub">You need to login with Zerodha before using the dashboard.</div>
+    <a href="/" class="lc-btn">Login with Zerodha</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TOP BAR
+══════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-icon">📈</div>
+    <span class="brand-name">SWTS</span>
+    <div class="brand-sep"></div>
+    <span class="brand-sub">Super Trend Trading System</span>
+  </div>
+  <div class="topbar-right">
+    <div class="user-chip" id="userChip" style="display:none;">
+      <div class="uc-dot"></div>
+      <span id="userChipLabel">—</span>
+    </div>
+    <div class="ws-badge disconnected" id="wsBadge">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">DISCONNECTED</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     LAYOUT
+══════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Symbol -->
+    <div class="sb-section">
+      <div class="sb-label">🔎 Symbol</div>
+      <div class="sym-search-wrap">
+        <div class="sym-search-row">
+          <div class="sym-input-wrap">
+            <span class="sym-icon">⌕</span>
+            <input type="text" class="sym-input" id="symInput"
+              placeholder="Search symbol or company..." autocomplete="off"/>
+          </div>
+          <select class="exch-select" id="exchSelect">
+            <option value="NSE">NSE</option>
+            <option value="NFO">NFO</option>
+            <option value="BSE">BSE</option>
+            <option value="MCX">MCX</option>
+          </select>
+        </div>
+        <div class="sym-dropdown" id="symDropdown"></div>
+      </div>
+
+      <div class="sym-selected" id="symSelected">
+        <div style="flex:1;">
+          <div class="sym-sel-ticker" id="selTicker">—</div>
+          <div class="sym-sel-info"   id="selInfo">—</div>
+          <div class="sym-sel-token"  id="selToken">—</div>
+        </div>
+        <button class="sym-clear-btn" id="symClearBtn">✕</button>
+      </div>
+    </div>
+
+    <!-- Timeframe -->
+    <div class="sb-section">
+      <div class="sb-label">⏱ Timeframe</div>
+      <select class="tf-select" id="tfSelect">
+        <option value="" disabled selected>Loading...</option>
+      </select>
+    </div>
+
+    <!-- Indicators -->
+    <div class="sb-section">
+      <div class="sb-label">📉 Indicators</div>
+
+      <div class="ind-row" id="indST">
+        <div class="ind-left">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleST" checked>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+          <div>
+            <div class="ind-name">Supertrend</div>
+            <div class="ind-desc">Trend direction signal</div>
+          </div>
+        </div>
+        <div class="ind-badge enabled" id="stBadge">ON</div>
+      </div>
+
+      <div class="ind-row" id="indATR">
+        <div class="ind-left">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleATR" checked>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+          <div>
+            <div class="ind-name">ATR</div>
+            <div class="ind-desc">Volatility filter</div>
+          </div>
+        </div>
+        <div class="ind-badge enabled" id="atrBadge">ON</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content" id="mainContent">
+
+    <!-- Placeholder — hidden once engine starts -->
+    <div class="content-placeholder" id="placeholder">
+      <div class="ph-icon">📊</div>
+      <div class="ph-title">Select a symbol and timeframe</div>
+      <div class="ph-sub">Live Supertrend + ATR will appear automatically</div>
+    </div>
+
+    <!-- Live Data Panel — shown once engine starts -->
+    <div class="live-panel" id="livePanel" style="display:none;">
+
+      <!-- Header row -->
+      <div class="live-header">
+        <div class="live-symbol" id="liveSymbol">—</div>
+        <div class="live-interval" id="liveInterval">—</div>
+        <div class="live-ts" id="liveTs">—</div>
+        <div class="live-candle" id="liveCandle"></div>
+      </div>
+
+      <!-- Value cards -->
+      <div class="val-grid" id="valGrid">
+
+        <!-- Close price — always shown -->
+        <div class="val-card">
+          <div class="val-label">Last Price</div>
+          <div class="val-num" id="valClose">—</div>
+        </div>
+
+        <!-- Supertrend card -->
+        <div class="val-card" id="cardST" style="display:none;">
+          <div class="val-label">Supertrend</div>
+          <div class="val-num" id="valST">—</div>
+          <div class="val-dir" id="valDir">—</div>
+        </div>
+
+        <!-- ATR card -->
+        <div class="val-card" id="cardATR" style="display:none;">
+          <div class="val-label">ATR</div>
+          <div class="val-num" id="valATR">—</div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  APP STATE
+// ══════════════════════════════════════
+const APP = {
+  symbol:   null,   // { token, symbol, name, exchange, segment }
+  interval: null,   // e.g. "5minute"
+  socket:   null,
+};
+
+// ══════════════════════════════════════
+//  ELEMENTS
+// ══════════════════════════════════════
+const loginOverlay = document.getElementById('loginOverlay');
+const userChip     = document.getElementById('userChip');
+const userChipLbl  = document.getElementById('userChipLabel');
+const wsBadge      = document.getElementById('wsBadge');
+const wsDot        = document.getElementById('wsDot');
+const wsLabel      = document.getElementById('wsLabel');
+const symInput     = document.getElementById('symInput');
+const exchSelect   = document.getElementById('exchSelect');
+const symDropdown  = document.getElementById('symDropdown');
+const symSelected  = document.getElementById('symSelected');
+const selTicker    = document.getElementById('selTicker');
+const selInfo      = document.getElementById('selInfo');
+const selToken     = document.getElementById('selToken');
+const symClearBtn  = document.getElementById('symClearBtn');
+const tfSelect     = document.getElementById('tfSelect');
+const engineToast  = document.getElementById('engineToast');
+
+// ══════════════════════════════════════
+//  LOGIN CHECK
+// ══════════════════════════════════════
+async function checkLogin() {
+  try {
+    const res  = await fetch('/status');
+    const data = await res.json();
+    if (!data.logged_in) {
+      loginOverlay.classList.add('show');
+      return;
+    }
+    // Show user chip
+    userChip.style.display = 'inline-flex';
+    userChipLbl.textContent = data.user || data.user_id || 'Connected';
+  } catch {
+    loginOverlay.classList.add('show');
+  }
+}
+
+// ══════════════════════════════════════
+//  TIMEFRAMES — fetch from REST API
+// ══════════════════════════════════════
+async function loadTimeframes() {
+  try {
+    const res  = await fetch('/api/timeframes');
+    const data = await res.json();
+
+    tfSelect.innerHTML = `<option value="" disabled selected>Select timeframe...</option>`;
+    data.forEach(tf => {
+      const opt = document.createElement('option');
+      opt.value       = tf.interval;
+      opt.textContent = tf.label;
+      tfSelect.appendChild(opt);
+    });
+  } catch {
+    tfSelect.innerHTML = `<option value="" disabled selected>Failed to load</option>`;
+  }
+}
+
+tfSelect.addEventListener('change', () => {
+  APP.interval = tfSelect.value;
+  trySubscribe();
+});
+
+// ══════════════════════════════════════
+//  SYMBOL SEARCH
+// ══════════════════════════════════════
+let searchTimer = null;
+
+symInput.addEventListener('input', () => {
+  const q = symInput.value.trim();
+  clearTimeout(searchTimer);
+  if (q.length < 2) { closeDropdown(); return; }
+  searchTimer = setTimeout(() => doSearch(q), 250);
+});
+
+exchSelect.addEventListener('change', () => {
+  const q = symInput.value.trim();
+  if (q.length >= 2) doSearch(q);
+});
+
+async function doSearch(query) {
+  const exchange = exchSelect.value;
+  symDropdown.innerHTML = `<div class="drop-msg">Searching...</div>`;
+  symDropdown.classList.add('open');
+  try {
+    const res  = await fetch(`/api/instruments?query=${encodeURIComponent(query)}&exchange=${exchange}&limit=12`);
+    const data = await res.json();
+    renderDropdown(data);
+  } catch {
+    symDropdown.innerHTML = `<div class="drop-msg">⚠ Could not fetch symbols</div>`;
+  }
+}
+
+function renderDropdown(items) {
+  if (!items.length) {
+    symDropdown.innerHTML = `<div class="drop-msg">No results found</div>`;
+    return;
+  }
+  symDropdown.innerHTML = items.map(i => `
+    <div class="drop-item"
+         data-token="${i.token}" data-symbol="${i.symbol}"
+         data-name="${i.name||''}" data-exchange="${i.exchange}"
+         data-segment="${i.segment||''}">
+      <span class="drop-sym">${i.symbol}</span>
+      <span class="drop-name">${i.name||'—'}</span>
+      <span class="drop-exch">${i.exchange}</span>
+    </div>
+  `).join('');
+
+  symDropdown.querySelectorAll('.drop-item').forEach(el => {
+    el.addEventListener('click', () => selectSymbol({
+      token:    parseInt(el.dataset.token),
+      symbol:   el.dataset.symbol,
+      name:     el.dataset.name,
+      exchange: el.dataset.exchange,
+      segment:  el.dataset.segment,
+    }));
+  });
+}
+
+function selectSymbol(inst) {
+  APP.symbol        = inst;
+  selTicker.textContent = inst.symbol;
+  selInfo.textContent   = inst.name || '—';
+  selToken.textContent  = `Token: ${inst.token}  ·  ${inst.exchange}`;
+  symSelected.classList.add('show');
+  symInput.value = '';
+  closeDropdown();
+  trySubscribe();
+}
+
+symClearBtn.addEventListener('click', () => {
+  APP.symbol = null;
+  symSelected.classList.remove('show');
+  symInput.value = '';
+  APP.socket?.emit('indicators:unsubscribe', {});
+  hideLivePanel();
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.sym-search-wrap')) closeDropdown();
+});
+
+function closeDropdown() {
+  symDropdown.classList.remove('open');
+  symDropdown.innerHTML = '';
+}
+
+// ══════════════════════════════════════
+//  INDICATOR SUBSCRIPTION
+//  Subscribe as soon as symbol + timeframe are both chosen.
+//  No engine start needed — just live ST/ATR stream.
+// ══════════════════════════════════════
+function trySubscribe() {
+  if (!APP.socket || !APP.symbol || !APP.interval) return;
+  APP.socket.emit('indicators:subscribe', {
+    token:    APP.symbol.token,
+    interval: APP.interval,
+  });
+  showLivePanel(APP.symbol.symbol, APP.interval);
+  cardST.style.display  = toggleST.checked  ? 'block' : 'none';
+  cardATR.style.display = toggleATR.checked ? 'block' : 'none';
+}
+
+function showToast(msg) {
+  engineToast.textContent = msg;
+  engineToast.classList.add('show');
+  setTimeout(() => engineToast.classList.remove('show'), 4000);
+}
+
+// ══════════════════════════════════════
+//  SOCKET.IO
+// ══════════════════════════════════════
+function setWs(connected) {
+  if (connected) {
+    wsBadge.className   = 'ws-badge connected';
+    wsDot.className     = 'ws-dot pulse';
+    wsLabel.textContent = 'CONNECTED';
+  } else {
+    wsBadge.className   = 'ws-badge disconnected';
+    wsDot.className     = 'ws-dot';
+    wsLabel.textContent = 'DISCONNECTED';
+  }
+}
+
+const sioScript  = document.createElement('script');
+sioScript.src    = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+sioScript.onload = () => {
+  const socket = io('http://localhost:8000', {
+    transports: ['websocket', 'polling'],
+  });
+  APP.socket = socket;
+
+  socket.on('connect',       () => setWs(true));
+  socket.on('disconnect',    () => setWs(false));
+  socket.on('connect_error', err => console.error('Socket.IO error:', err.message));
+
+  // Live indicator stream — fires every 1s as soon as symbol+timeframe selected
+  socket.on('indicators:data', data => onTick(data));
+
+  socket.on('tick',  data => onTick(data));
+  socket.on('error', data => showToast(data.message || 'Unknown error'));
+};
+document.head.appendChild(sioScript);
+
+// ══════════════════════════════════════
+//  INDICATOR TOGGLES
+// ══════════════════════════════════════
+const toggleST  = document.getElementById('toggleST');
+const toggleATR = document.getElementById('toggleATR');
+const stBadge   = document.getElementById('stBadge');
+const atrBadge  = document.getElementById('atrBadge');
+const indSTRow  = document.getElementById('indST');
+const indATRRow = document.getElementById('indATR');
+const cardST    = document.getElementById('cardST');
+const cardATR   = document.getElementById('cardATR');
+
+function applyIndToggle(name, enabled) {
+  if (name === 'supertrend') {
+    stBadge.textContent  = enabled ? 'ON' : 'OFF';
+    stBadge.className    = `ind-badge ${enabled ? 'enabled' : 'disabled'}`;
+    indSTRow.classList.toggle('active', enabled);
+    cardST.style.display = enabled ? 'block' : 'none';
+  } else {
+    atrBadge.textContent  = enabled ? 'ON' : 'OFF';
+    atrBadge.className    = `ind-badge ${enabled ? 'enabled' : 'disabled'}`;
+    indATRRow.classList.toggle('active', enabled);
+    cardATR.style.display = enabled ? 'block' : 'none';
+  }
+  // send to backend via socket
+  if (APP.socket) {
+    APP.socket.emit('indicator:toggle', { name, enabled });
+  }
+}
+
+toggleST.addEventListener('change',  () => applyIndToggle('supertrend', toggleST.checked));
+toggleATR.addEventListener('change', () => applyIndToggle('atr',        toggleATR.checked));
+
+// init rows as active (both ON by default)
+indSTRow.classList.add('active');
+indATRRow.classList.add('active');
+
+// ══════════════════════════════════════
+//  LIVE PANEL
+// ══════════════════════════════════════
+const placeholder = document.getElementById('placeholder');
+const livePanel   = document.getElementById('livePanel');
+const liveSymbol  = document.getElementById('liveSymbol');
+const liveInterval = document.getElementById('liveInterval');
+const liveTs      = document.getElementById('liveTs');
+const liveCandle  = document.getElementById('liveCandle');
+const valClose    = document.getElementById('valClose');
+const valST       = document.getElementById('valST');
+const valDir      = document.getElementById('valDir');
+const valATR      = document.getElementById('valATR');
+
+function showLivePanel(symbol, interval) {
+  placeholder.style.display = 'none';
+  livePanel.style.display   = 'flex';
+  liveSymbol.textContent    = symbol;
+  liveInterval.textContent  = interval;
+}
+
+function hideLivePanel() {
+  placeholder.style.display = 'flex';
+  livePanel.style.display   = 'none';
+}
+
+function onTick(data) {
+  // timestamp
+  liveTs.textContent = data.timestamp || '—';
+
+  // new candle indicator
+  if (data.new_candle) {
+    liveCandle.textContent  = '● NEW CANDLE';
+    liveCandle.className    = 'live-candle new';
+    setTimeout(() => { liveCandle.textContent = ''; liveCandle.className = 'live-candle'; }, 3000);
+  }
+
+  // close price
+  valClose.textContent = data.close != null ? data.close.toFixed(2) : '—';
+
+  // supertrend
+  if (toggleST.checked) {
+    const stVal = data.supertrend;
+    const isValid = stVal != null && !isNaN(stVal);
+    valST.textContent = isValid ? stVal.toFixed(2) : '—';
+
+    const dir = data.direction || '';
+    if (dir === 'GREEN') {
+      valDir.textContent  = '▲ BULLISH';
+      valDir.className    = 'val-dir green';
+      cardST.className    = 'val-card st-green';
+    } else if (dir === 'RED') {
+      valDir.textContent  = '▼ BEARISH';
+      valDir.className    = 'val-dir red';
+      cardST.className    = 'val-card st-red';
+    } else {
+      valDir.textContent  = '—';
+      valDir.className    = 'val-dir';
+      cardST.className    = 'val-card';
+    }
+  }
+
+  // ATR
+  if (toggleATR.checked) {
+    valATR.textContent = data.atr != null ? data.atr.toFixed(2) : '—';
+  }
+}
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+checkLogin();
+loadTimeframes();
+</script>
+</body>
+</html>

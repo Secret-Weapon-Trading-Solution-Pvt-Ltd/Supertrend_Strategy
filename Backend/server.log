@@ -15,8 +15,21 @@ ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 80
 INFO:     Waiting for application shutdown.
 2026-03-18 16:20:14,058 INFO main — Scheduler: stopped
 2026-03-18 16:20:14,058 INFO apscheduler.scheduler — Scheduler has been shut down
-INFO:     Application shutdown complete.
-NSE: 9459 instruments saved.
-NFO: 51570 instruments saved.
-BSE: 12606 instruments saved.
-MCX: 33718 instruments saved.
+INFO:     App2026-03-18 16:51:34,686 ERROR kiteconnect.ticker — Connection error: 1006 - connection was closed uncleanly (peer dropped the TCP connection without previous WebSocket closing handshake)
+2026-03-18 16:51:34,688 ERROR zeroda — KiteTicker error: 1006 connection was closed uncleanly (peer dropped the TCP connection without previous WebSocket closing handshake)
+2026-03-18 16:51:34,688 ERROR kiteconnect.ticker — Connection closed: 1006 - connection was closed uncleanly (peer dropped the TCP connection without previous WebSocket closing handshake)
+2026-03-18 16:51:34,689 WARNING zeroda — KiteTicker closed: 1006 connection was closed uncleanly (peer dropped the TCP connection without previous WebSocket closing handshake)
+2026-03-18 16:51:37,767 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 1. Next retry in around: 3 seconds
+2026-03-18 16:51:37,768 INFO zeroda — KiteTicker reconnecting (attempt 1)...
+2026-03-18 16:51:44,767 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 2. Next retry in around: 7 seconds
+2026-03-18 16:51:44,768 INFO zeroda — KiteTicker reconnecting (attempt 2)...
+2026-03-18 16:52:05,613 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 3. Next retry in around: 21 seconds
+2026-03-18 16:52:05,614 INFO zeroda — KiteTicker reconnecting (attempt 3)...
+2026-03-18 16:53:04,863 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 4. Next retry in around: 59 seconds
+2026-03-18 16:53:04,863 INFO zeroda — KiteTicker reconnecting (attempt 4)...
+2026-03-18 16:53:50,466 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 5. Next retry in around: 46 seconds
+2026-03-18 16:53:50,467 INFO zeroda — KiteTicker reconnecting (attempt 5)...
+2026-03-18 16:54:59,993 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 6. Next retry in around: 70 seconds
+2026-03-18 16:54:59,993 INFO zeroda — KiteTicker reconnecting (attempt 6)...
+2026-03-18 16:55:41,659 ERROR kiteconnect.ticker — Retrying connection. Retry attempt count: 7. Next retry in around: 42 seconds
+2026-03-18 16:55:41,660 INFO zeroda — KiteTicker reconnecting (attempt 7)...

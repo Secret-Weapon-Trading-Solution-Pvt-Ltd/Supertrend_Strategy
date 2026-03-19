@@ -44,7 +44,7 @@ _CANDLE_SECONDS = {
 }
 
 # How often to check Zerodha for a new candle (seconds)
-_CHECK_INTERVAL = 10
+_CHECK_INTERVAL = 1
 
 
 class EngineState(Enum):

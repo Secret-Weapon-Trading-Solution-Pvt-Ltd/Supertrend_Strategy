@@ -116,6 +116,7 @@ class TradingEngine:
             log.info("Engine RESUMED")
 
     def stop(self) -> None:
+        self._exit_all_positions(reason="ENGINE_STOP")
         self._stop_event.set()
         self.state = EngineState.STOPPED
         log.info("Engine STOPPED")
@@ -295,6 +296,7 @@ class TradingEngine:
 
             emit_sync("position:update", {
                 "symbol":         position.get("symbol", self.symbol),
+                "qty":            position.get("qty", self.qty),
                 "entry_price":    position.get("entry_price", 0),
                 "current_price":  close,
                 "peak_price":     position.get("peak_price", 0),
@@ -355,6 +357,71 @@ class TradingEngine:
                     "entry_time":       position.get("entry_time"),
                     "exit_time":        None,
                 })
+
+    # ── Exit all positions (called on engine stop) ─────────────────────────────
+
+    def _exit_all_positions(self, reason: str = "ENGINE_STOP") -> None:
+        """Close any open position at current market price before engine stops."""
+        positions = self.broker.get_positions()
+        if not positions:
+            return
+
+        # Best available exit price: live tick → confirmed close
+        exit_price = 0.0
+        ticks = self.broker.get_latest_ticks()
+        tick  = ticks.get(self.instrument_token)
+        if tick and tick.get("last_price"):
+            exit_price = float(tick["last_price"])
+        elif not self.latest_df.empty:
+            exit_price = float(self.latest_df.iloc[-1]["close"])
+
+        for position in positions:
+            qty         = position.get("qty", self.qty)
+            entry_price = position.get("entry_price", 0.0)
+            pnl_points  = round(exit_price - entry_price, 2)
+            pnl_amount  = round(pnl_points * qty, 2)
+            result      = "PROFIT" if pnl_points >= 0 else "LOSS"
+
+            log.info(
+                "[ENGINE] STOP EXIT — reason=%s | entry=%.2f | exit=%.2f | P&L=%.2f (%s)",
+                reason, entry_price, exit_price, pnl_points, result,
+            )
+
+            emit_sync("exit:triggered", {
+                "reason":      reason,
+                "entry_price": entry_price,
+                "exit_price":  exit_price,
+                "pnl_points":  pnl_points,
+                "pnl_amount":  pnl_amount,
+                "result":      result,
+            })
+
+            order_id = self.broker.place_order(
+                symbol=self.symbol, token=self.instrument_token,
+                qty=qty, transaction_type="SELL",
+                product="MIS", order_type="MARKET",
+                price=exit_price,
+            )
+            emit_sync("order:placed", {
+                "type": "SELL", "symbol": self.symbol,
+                "qty": qty, "price": exit_price, "order_id": order_id,
+            })
+
+            save_trade_sync({
+                "symbol":           self.symbol,
+                "instrument_token": self.instrument_token,
+                "qty":              qty,
+                "entry_price":      entry_price,
+                "exit_price":       exit_price,
+                "pnl_points":       pnl_points,
+                "pnl_amount":       pnl_amount,
+                "result":           result,
+                "exit_reason":      reason,
+                "broker_mode":      settings.broker_mode,
+                "interval":         self.interval,
+                "entry_time":       position.get("entry_time"),
+                "exit_time":        None,
+            })
 
     # ── Buffer helpers ─────────────────────────────────────────────────────────
 

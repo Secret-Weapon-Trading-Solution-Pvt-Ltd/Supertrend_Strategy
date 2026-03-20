@@ -347,6 +347,15 @@ async def ticker_ticks():
     return zeroda.get_ticks()
 
 
+@fastapi_app.get("/api/forward/summary")
+async def forward_summary():
+    """Return ForwardTestBroker P&L summary when engine is in forward_test mode."""
+    from broker.forward_test import ForwardTestBroker
+    if _engine and isinstance(_engine.broker, ForwardTestBroker):
+        return _engine.broker.summary()
+    return {"total_trades": 0, "total_pnl": 0.0, "wins": 0, "losses": 0, "trades": []}
+
+
 # ── Socket.IO event handlers (client → server) ────────────────────────────────
 
 @sio.event

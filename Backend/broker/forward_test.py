@@ -123,10 +123,11 @@ class ForwardTestBroker(BrokerABC):
             log.warning("[FT] No open position to close for %s", order["symbol"])
             return
 
-        entry = self.position["entry_price"]
-        exit_ = order["fill_price"]
-        qty   = self.position["qty"]
-        pnl   = (exit_ - entry) * qty
+        entry      = self.position["entry_price"]
+        exit_      = order["fill_price"]
+        qty        = self.position["qty"]
+        pnl_points = round(exit_ - entry, 2)
+        pnl_amount = round(pnl_points * qty, 2)
 
         trade = {
             "symbol":      self.position["symbol"],
@@ -135,14 +136,16 @@ class ForwardTestBroker(BrokerABC):
             "exit_price":  exit_,
             "entry_time":  self.position["entry_time"],
             "exit_time":   order["timestamp"],
-            "pnl":         round(pnl, 2),
-            "result":      "PROFIT" if pnl >= 0 else "LOSS",
+            "pnl_points":  pnl_points,
+            "pnl_amount":  pnl_amount,
+            "pnl":         pnl_amount,   # kept for backward compat
+            "result":      "PROFIT" if pnl_amount >= 0 else "LOSS",
         }
         self.trades.append(trade)
 
         log.info(
             "[FT] SELL %s | qty=%d | entry=%.2f | exit=%.2f | P&L=%.2f (%s)",
-            trade["symbol"], qty, entry, exit_, pnl, trade["result"],
+            trade["symbol"], qty, entry, exit_, pnl_amount, trade["result"],
         )
 
         self.position = None
@@ -196,8 +199,8 @@ class ForwardTestBroker(BrokerABC):
         if not self.trades:
             return {"total_trades": 0, "total_pnl": 0.0, "wins": 0, "losses": 0}
 
-        total_pnl = sum(t["pnl"] for t in self.trades)
-        wins      = sum(1 for t in self.trades if t["pnl"] >= 0)
+        total_pnl = sum(t["pnl_amount"] for t in self.trades)
+        wins      = sum(1 for t in self.trades if t["pnl_amount"] >= 0)
         losses    = len(self.trades) - wins
 
         return {

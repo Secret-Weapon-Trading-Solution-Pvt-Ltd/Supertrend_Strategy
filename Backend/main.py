@@ -183,7 +183,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     if _engine:
-        _engine.stop()
+        _engine.shutdown()
     scheduler.shutdown()
     log.info("Scheduler: stopped")
 

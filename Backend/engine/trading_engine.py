@@ -117,10 +117,17 @@ class TradingEngine:
             log.info("Engine RESUMED")
 
     def stop(self) -> None:
+        """Exit all open positions and block new entries. Data + indicators keep running."""
+        self._exit_all_positions(reason="ENGINE_STOP")
+        self.state = EngineState.STOPPED
+        log.info("Engine STOPPED — positions exited, data loop still running")
+
+    def shutdown(self) -> None:
+        """Fully kill the loop — called only on app shutdown."""
         self._exit_all_positions(reason="ENGINE_STOP")
         self._stop_event.set()
         self.state = EngineState.STOPPED
-        log.info("Engine STOPPED")
+        log.info("Engine SHUTDOWN — loop killed")
 
     # ── Main loop ──────────────────────────────────────────────────────────────
 
@@ -132,9 +139,6 @@ class TradingEngine:
 
         # Poll every CHECK_INTERVAL seconds for new candle
         while not self._stop_event.is_set():
-            if self.state == EngineState.PAUSED:
-                time.sleep(_CHECK_INTERVAL)
-                continue
             try:
                 self._tick()
             except Exception as exc:
@@ -282,7 +286,7 @@ class TradingEngine:
             signal = sig.get_signal(df)
             self.last_signal = signal
 
-            if signal == "BUY":
+            if signal == "BUY" and self.state == EngineState.RUNNING:
                 log.info("[ENGINE] BUY signal — %s qty=%d @ %.2f", self.symbol, self.qty, close)
                 emit_sync("signal:buy", {"symbol": self.symbol, "price": close, "time": ts})
                 order_id = self.broker.place_order(

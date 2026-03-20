@@ -24,13 +24,16 @@ log = logging.getLogger(__name__)
 
 class ForwardTestBroker(BrokerABC):
 
-    def __init__(self, zerodha_broker=None):
+    def __init__(self, zerodha_broker=None, initial_capital: float = 100_000.0):
         """
-        zerodha_broker: optional ZerodhaBroker instance.
-        Used to fetch real candles and LTP for simulation.
-        If None, get_candles() and get_ltp() return empty/zero.
+        zerodha_broker:   optional ZerodhaBroker instance for real market data.
+        initial_capital:  virtual capital to trade with (default ₹1,00,000).
         """
         self._real = zerodha_broker          # underlying real broker for market data
+
+        # Capital tracking
+        self.initial_capital:   float = initial_capital
+        self.available_capital: float = initial_capital
 
         # Active virtual position (only one at a time — long only)
         self.position: dict | None = None    # {order_id, symbol, token, qty, entry_price, entry_time}
@@ -101,6 +104,16 @@ class ForwardTestBroker(BrokerABC):
             log.warning("[FT] Already in a position — ignoring BUY for %s", order["symbol"])
             return
 
+        cost = order["fill_price"] * order["qty"]
+        if cost > self.available_capital:
+            log.warning(
+                "[FT] Insufficient capital — need ₹%.2f, have ₹%.2f — BUY blocked",
+                cost, self.available_capital,
+            )
+            return
+
+        self.available_capital -= cost
+
         self.position = {
             "order_id":    order["order_id"],
             "symbol":      order["symbol"],
@@ -112,9 +125,9 @@ class ForwardTestBroker(BrokerABC):
         }
 
         log.info(
-            "[FT] BUY  %s | qty=%d | entry=%.2f | time=%s",
-            order["symbol"], order["qty"],
-            order["fill_price"],
+            "[FT] BUY  %s | qty=%d | entry=%.2f | capital_used=₹%.2f | capital_left=₹%.2f | time=%s",
+            order["symbol"], order["qty"], order["fill_price"],
+            cost, self.available_capital,
             order["timestamp"].strftime("%H:%M:%S"),
         )
 
@@ -143,9 +156,13 @@ class ForwardTestBroker(BrokerABC):
         }
         self.trades.append(trade)
 
+        # Return proceeds to available capital
+        self.available_capital += exit_ * qty
+
         log.info(
-            "[FT] SELL %s | qty=%d | entry=%.2f | exit=%.2f | P&L=%.2f (%s)",
+            "[FT] SELL %s | qty=%d | entry=%.2f | exit=%.2f | P&L=%.2f (%s) | capital=₹%.2f",
             trade["symbol"], qty, entry, exit_, pnl_amount, trade["result"],
+            self.available_capital,
         )
 
         self.position = None
@@ -197,17 +214,27 @@ class ForwardTestBroker(BrokerABC):
     def summary(self) -> dict:
         """Return P&L summary of all completed trades."""
         if not self.trades:
-            return {"total_trades": 0, "total_pnl": 0.0, "wins": 0, "losses": 0}
+            return {
+                "total_trades":      0,
+                "total_pnl":         0.0,
+                "wins":              0,
+                "losses":            0,
+                "initial_capital":   self.initial_capital,
+                "available_capital": round(self.available_capital, 2),
+                "trades":            [],
+            }
 
         total_pnl = sum(t["pnl_amount"] for t in self.trades)
         wins      = sum(1 for t in self.trades if t["pnl_amount"] >= 0)
         losses    = len(self.trades) - wins
 
         return {
-            "total_trades": len(self.trades),
-            "total_pnl":    round(total_pnl, 2),
-            "wins":         wins,
-            "losses":       losses,
-            "win_rate":     round(wins / len(self.trades) * 100, 1),
-            "trades":       self.trades,
+            "total_trades":      len(self.trades),
+            "total_pnl":         round(total_pnl, 2),
+            "wins":              wins,
+            "losses":            losses,
+            "win_rate":          round(wins / len(self.trades) * 100, 1),
+            "initial_capital":   self.initial_capital,
+            "available_capital": round(self.available_capital, 2),
+            "trades":            self.trades,
         }

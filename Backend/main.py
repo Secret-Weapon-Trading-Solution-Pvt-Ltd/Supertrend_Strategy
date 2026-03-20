@@ -514,6 +514,8 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
     if _access_token:
         broker.set_access_token(_access_token)
 
+    # Subscribe token to global KiteTicker so live ticks flow in
+    zeroda.subscribe([token])
     log.info("indicators:loop START — sid=%s token=%d interval=%s", sid, token, interval)
 
     # Cached indicator state — only recalculated on new candle close
@@ -567,8 +569,11 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
             if not recent.empty and base_df is not None:
                 current_ts = recent.index[-1]
                 latest_row = recent.iloc[-1]
-                close      = round(float(latest_row["close"]), 2)
                 new_candle = (last_candle_ts is not None and current_ts != last_candle_ts)
+
+                # Live price: WebSocket last_price (real-time) else candle close (fallback)
+                _tick      = zeroda.get_ticks().get(token)
+                live_price = round(float(_tick["last_price"]), 2) if _tick and _tick.get("last_price") else round(float(latest_row["close"]), 2)
 
                 if new_candle:
                     # New candle closed — fetch fresh 100 candles as new base
@@ -589,7 +594,7 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
                 live_df.loc[current_ts, "open"]   = float(latest_row["open"])
                 live_df.loc[current_ts, "high"]   = float(latest_row["high"])
                 live_df.loc[current_ts, "low"]    = float(latest_row["low"])
-                live_df.loc[current_ts, "close"]  = float(latest_row["close"])
+                live_df.loc[current_ts, "close"]  = live_price
                 live_df.loc[current_ts, "volume"] = float(latest_row["volume"])
 
                 if settings.use_supertrend:
@@ -606,13 +611,13 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
 
                 log.info(
                     "indicators:emit — sid=%s close=%.2f ST=%s ATR=%s dir=%s%s",
-                    sid, close, st_val, atr_val, direction,
+                    sid, live_price, st_val, atr_val, direction,
                     " [NEW CANDLE]" if new_candle else "",
                 )
 
                 await sio.emit("indicators:data", {
                     "timestamp":  ts,
-                    "close":      close,
+                    "close":      live_price,
                     "supertrend": st_val,
                     "atr":        atr_val,
                     "direction":  direction,
@@ -626,6 +631,8 @@ async def _indicators_loop(sid: str, token: int, interval: str) -> None:
 
         await asyncio.sleep(1)
 
+    # Unsubscribe token from global KiteTicker on loop exit
+    zeroda.unsubscribe([token])
     log.info("indicators:loop STOP — sid=%s", sid)
 
 

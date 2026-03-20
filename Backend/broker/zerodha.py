@@ -6,7 +6,10 @@ Credentials come from config/settings.py (read from .env).
 
 import logging
 import pandas as pd
+import pytz
 from datetime import datetime, timedelta
+
+_IST = pytz.timezone("Asia/Kolkata")
 
 from kiteconnect.connect import KiteConnect
 from broker.base import BrokerABC
@@ -62,7 +65,7 @@ class ZerodhaBroker(BrokerABC):
         Returns an empty DataFrame if no data is returned.
         """
         days = _LOOKBACK_DAYS.get(interval, 30)
-        to_date   = datetime.now()
+        to_date   = datetime.now(_IST)
         from_date = to_date - timedelta(days=days)
 
         from_str = from_date.strftime("%Y-%m-%d %H:%M:%S")

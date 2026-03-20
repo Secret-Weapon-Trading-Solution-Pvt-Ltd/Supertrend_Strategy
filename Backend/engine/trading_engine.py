@@ -21,6 +21,7 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
+import zeroda
 from broker.base import BrokerABC
 from strategy.indicators import calculate_supertrend, calculate_atr
 from strategy import signals as sig
@@ -242,6 +243,12 @@ class TradingEngine:
         last      = df.iloc[-1]
         ts        = df.index[-1].strftime("%H:%M:%S")
         close     = float(last["close"])
+
+        # Override with WebSocket last_price for display — no HTTP lag
+        _tick = zeroda.get_ticks().get(self.instrument_token)
+        if _tick and _tick.get("last_price"):
+            close = float(_tick["last_price"])
+
         st_dir    = int(last.get("st_direction", 0))    if "st_direction" in df.columns else 0
         st_val    = round(float(last.get("supertrend", float("nan"))), 2) if "supertrend" in df.columns else float("nan")
         atr_val   = float(last.get("atr", 0.0))         if "atr"          in df.columns else None

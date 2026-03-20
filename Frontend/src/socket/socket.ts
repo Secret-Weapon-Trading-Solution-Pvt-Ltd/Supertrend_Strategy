@@ -32,13 +32,17 @@ import {
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"
 
 // ── Shared socket instance ────────────────────────────────────────────────────
+// auth.token is sent on every (re)connect — backend can validate the JWT.
+
+import keycloak from "../auth/keycloak"
 
 export const socket: Socket = io(BACKEND_URL, {
-  transports:       ["websocket"],   // skip long-polling
-  autoConnect:      true,
-  reconnection:     true,
+  transports:        ["websocket"],
+  autoConnect:       true,
+  reconnection:      true,
   reconnectionDelay: 2000,
   reconnectionAttempts: 10,
+  auth: (cb) => cb({ token: keycloak.token }),
 })
 
 // ── Typed emit helpers ────────────────────────────────────────────────────────

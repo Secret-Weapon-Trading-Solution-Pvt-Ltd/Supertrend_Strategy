@@ -1,11 +1,13 @@
 import { useSocket } from "../hooks/useSocket"
 import { useTick } from "../hooks/useTick"
 import { useEngine } from "../hooks/useEngine"
+import { useAuth } from "../auth/KeycloakProvider"
 
 export default function Header() {
   const { connected } = useSocket()
   const tick          = useTick()
   const { engineState } = useEngine()
+  const { username, logout } = useAuth()
 
   return (
     <header style={{
@@ -76,6 +78,25 @@ export default function Header() {
             background:   connected ? "#059669" : "#dc2626",
           }} />
           <span style={{ color: "#64748b" }}>{connected ? "Connected" : "Disconnected"}</span>
+        </div>
+
+        {/* User + Logout */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: "1px solid #e2e8f0", paddingLeft: 16 }}>
+          <span style={{ color: "#475569", fontSize: 13 }}>{username}</span>
+          <button
+            onClick={logout}
+            style={{
+              padding:      "3px 10px",
+              borderRadius: 4,
+              border:       "1px solid #e2e8f0",
+              background:   "#fff",
+              color:        "#64748b",
+              fontSize:     12,
+              cursor:       "pointer",
+            }}
+          >
+            Logout
+          </button>
         </div>
       </div>
 

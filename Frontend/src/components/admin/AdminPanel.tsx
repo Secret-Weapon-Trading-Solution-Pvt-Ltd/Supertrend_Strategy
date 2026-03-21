@@ -13,7 +13,7 @@ const STATS = [
 ]
 
 export default function AdminPanel() {
-  const { users, loading, error, assignRole, removeRole, setEnabled, deleteUser } = useAdminUsers()
+  const { users, loading, error, assignRole, removeRole, deleteUser } = useAdminUsers()
   const [activeFilter, setActiveFilter] = useState("all")
 
   const counts: Record<string, number> = {
@@ -143,7 +143,6 @@ export default function AdminPanel() {
             activeFilter={activeFilter}
             onAssign={assignRole}
             onRemove={removeRole}
-            onToggle={setEnabled}
             onDelete={deleteUser}
           />
         )}

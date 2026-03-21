@@ -9,7 +9,6 @@ interface Props {
   activeFilter: string
   onAssign:     (userId: string, role: string) => void
   onRemove:     (userId: string, role: string) => void
-  onToggle:     (userId: string, enabled: boolean) => void
   onDelete:     (userId: string) => void
 }
 
@@ -27,10 +26,9 @@ const TH: React.CSSProperties = {
 }
 
 
-export default function UserTable({ users, activeFilter, onAssign, onRemove, onToggle, onDelete }: Props) {
+export default function UserTable({ users, activeFilter, onAssign, onRemove, onDelete }: Props) {
   const [query, setQuery] = useState("")
 
-  // activeFilter from stat card takes precedence; local pill is secondary search
   const filtered = users.filter(u => {
     const matchQ = !query ||
       u.username?.toLowerCase().includes(query.toLowerCase()) ||
@@ -51,7 +49,6 @@ export default function UserTable({ users, activeFilter, onAssign, onRemove, onT
         alignItems: "center", borderBottom: "1px solid #334155",
         background: "#1e293b",
       }}>
-        {/* Search */}
         <div style={{ flex: 1, position: "relative" }}>
           <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#475569", pointerEvents: "none" }}>🔍</span>
           <input
@@ -69,9 +66,6 @@ export default function UserTable({ users, activeFilter, onAssign, onRemove, onT
             onBlur={e =>  (e.currentTarget.style.borderColor = "#334155")}
           />
         </div>
-
-
-        {/* Count */}
         <div style={{
           padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
           background: "#0f172a", color: "#475569", border: "1px solid #334155",
@@ -86,24 +80,29 @@ export default function UserTable({ users, activeFilter, onAssign, onRemove, onT
         <thead>
           <tr>
             <th style={TH}>User</th>
-            <th style={TH}>Roles</th>
-            <th style={TH}>Actions</th>
-            <th style={TH}>Joined</th>
             <th style={TH}>Status</th>
-            <th style={TH}>Delete</th>
+            <th style={TH}>Joining</th>
+            <th style={TH}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan={6} style={{ padding: "48px", textAlign: "center", fontSize: 13, color: "#475569" }}>
+              <td colSpan={4} style={{ padding: "48px", textAlign: "center", fontSize: 13, color: "#475569" }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
                 No users match your search
               </td>
             </tr>
           ) : (
             filtered.map(u => (
-              <UserRow key={u.id} user={u} onAssign={onAssign} onRemove={onRemove} onToggle={onToggle} onDelete={onDelete} />
+              <UserRow
+                key={u.id}
+                user={u}
+                activeFilter={activeFilter}
+                onAssign={onAssign}
+                onRemove={onRemove}
+                onDelete={onDelete}
+              />
             ))
           )}
         </tbody>

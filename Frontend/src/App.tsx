@@ -1,36 +1,23 @@
-import { useState }    from "react"
-import Sidebar          from "./components/Sidebar"
-import TopBar           from "./components/TopBar"
-import StatsBar         from "./components/StatsBar"
-import StrategyPanel    from "./components/StrategyPanel"
-import PositionPanel    from "./components/PositionPanel"
-import TradeLog         from "./components/TradeLog"
-import LogPanel         from "./components/LogPanel"
+import { useEffect }   from "react"
 import AdminLayout      from "./components/admin/AdminLayout"
 import { useAuth }      from "./auth/KeycloakProvider"
 
-export type Page = "dashboard" | "trades" | "logs" | "settings"
-
-function SettingsPage() {
-  return (
-    <div style={{
-      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
-      padding: "32px", boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-      color: "#94a3b8", textAlign: "center",
-    }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>⚙️</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#475569" }}>Settings</div>
-      <div style={{ fontSize: 13, marginTop: 6 }}>Coming soon</div>
-    </div>
-  )
-}
+export type Page = "dashboard"
 
 export default function App() {
-  const { hasRole } = useAuth()
-  const [page, setPage] = useState<Page>("dashboard")
+  const { hasRole, token } = useAuth()
+  const isAdminRoute = window.location.pathname === "/admin"
 
-  // Admin route — render completely separate layout, no main sidebar/topbar
-  if (window.location.pathname === "/admin") {
+  // Save Keycloak token → redirect approved users to the HTML dashboard
+  useEffect(() => {
+    if (!isAdminRoute && token) {
+      localStorage.setItem("swts_token", token)
+      window.location.href = "/dashboard"
+    }
+  }, [token, isAdminRoute])
+
+  // ── /admin route ──────────────────────────────────────────────────────────
+  if (isAdminRoute) {
     if (!hasRole("admin")) {
       return (
         <div style={{
@@ -54,52 +41,15 @@ export default function App() {
     return <AdminLayout />
   }
 
+  // ── Redirecting approved users → /dashboard ───────────────────────────────
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f1f5f9" }}>
-
-      <Sidebar page={page} setPage={setPage} />
-
-      <div style={{ marginLeft: 240, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-
-        <TopBar page={page} />
-
-        {page === "dashboard" && (
-          <>
-            <StatsBar />
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <StrategyPanel />
-                <PositionPanel />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "58fr 42fr", gap: 16, minHeight: 360 }}>
-                <TradeLog />
-                <LogPanel />
-              </div>
-            </div>
-          </>
-        )}
-
-        {page === "trades" && (
-          <div style={{ padding: "20px 24px", flex: 1 }}>
-            <TradeLog />
-          </div>
-        )}
-
-        {page === "logs" && (
-          <div style={{ padding: "20px 24px", flex: 1, display: "flex", flexDirection: "column" }}>
-            <div style={{ flex: 1, minHeight: "calc(100vh - 120px)" }}>
-              <LogPanel />
-            </div>
-          </div>
-        )}
-
-        {page === "settings" && (
-          <div style={{ padding: "20px 24px" }}>
-            <SettingsPage />
-          </div>
-        )}
-
-      </div>
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      height: "100vh", background: "#0d1117",
+      fontFamily: "system-ui, sans-serif", flexDirection: "column", gap: 10,
+    }}>
+      <div style={{ fontSize: 22, color: "#58a6ff" }}>↗</div>
+      <div style={{ fontSize: 14, color: "#8b949e" }}>Loading dashboard…</div>
     </div>
   )
 }

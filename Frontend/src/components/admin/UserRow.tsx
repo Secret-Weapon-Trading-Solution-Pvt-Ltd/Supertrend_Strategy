@@ -1,8 +1,8 @@
 // components/admin/UserRow.tsx — Dark theme single user row.
 
-import { useState }       from "react"
-import RoleBadge          from "./RoleBadge"
-import type { AdminUser } from "../../hooks/useAdminUsers"
+import { useState }                            from "react"
+import RoleBadge                               from "./RoleBadge"
+import { isEffectivelyPending, type AdminUser } from "../../hooks/useAdminUsers"
 
 const ASSIGNABLE_ROLES = ["admin", "approve", "revoke", "pending"] as const
 
@@ -11,10 +11,12 @@ interface Props {
   onAssign: (userId: string, role: string) => void
   onRemove: (userId: string, role: string) => void
   onToggle: (userId: string, enabled: boolean) => void
+  onDelete: (userId: string) => void
 }
 
-export default function UserRow({ user, onAssign, onRemove, onToggle }: Props) {
-  const [showRoleMenu, setShowRoleMenu] = useState(false)
+export default function UserRow({ user, onAssign, onRemove, onToggle, onDelete }: Props) {
+  const [showRoleMenu, setShowRoleMenu]   = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const unassigned = ASSIGNABLE_ROLES.filter(r => !user.roles.includes(r))
 
   return (
@@ -87,9 +89,9 @@ export default function UserRow({ user, onAssign, onRemove, onToggle }: Props) {
         </div>
       </td>
 
-      {/* Quick actions — Approve/Revoke for pending, empty cell otherwise */}
+      {/* Quick actions — Approve/Revoke for pending or no-role users */}
       <td style={{ padding: "13px 20px" }}>
-        {user.roles.includes("pending") && (
+        {isEffectivelyPending(user) && (
           <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={() => onAssign(user.id, "approve")}
@@ -137,6 +139,42 @@ export default function UserRow({ user, onAssign, onRemove, onToggle }: Props) {
         >
           {user.enabled ? "● Active" : "○ Disabled"}
         </button>
+      </td>
+
+      {/* Delete */}
+      <td style={{ padding: "13px 20px" }}>
+        {confirmDelete ? (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>Sure?</span>
+            <button
+              onClick={() => { onDelete(user.id); setConfirmDelete(false) }}
+              style={{
+                padding: "4px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700,
+                border: "1px solid #7f1d1d", background: "#7f1d1d", color: "#fff",
+                cursor: "pointer",
+              }}
+            >Yes</button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{
+                padding: "4px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700,
+                border: "1px solid #334155", background: "transparent", color: "#64748b",
+                cursor: "pointer",
+              }}
+            >No</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              padding: "4px 12px", borderRadius: 7, fontSize: 11, fontWeight: 700,
+              border: "1px solid #334155", background: "transparent", color: "#475569",
+              cursor: "pointer", transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#7f1d1d"; e.currentTarget.style.color = "#f87171" }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#475569" }}
+          >🗑 Delete</button>
+        )}
       </td>
     </tr>
   )

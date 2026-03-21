@@ -1,8 +1,8 @@
 // components/admin/UserTable.tsx — Dark theme filterable user list.
 
-import { useState }       from "react"
-import UserRow            from "./UserRow"
-import type { AdminUser } from "../../hooks/useAdminUsers"
+import { useState }                            from "react"
+import UserRow                                 from "./UserRow"
+import { isEffectivelyPending, type AdminUser } from "../../hooks/useAdminUsers"
 
 interface Props {
   users:        AdminUser[]
@@ -10,6 +10,7 @@ interface Props {
   onAssign:     (userId: string, role: string) => void
   onRemove:     (userId: string, role: string) => void
   onToggle:     (userId: string, enabled: boolean) => void
+  onDelete:     (userId: string) => void
 }
 
 const TH: React.CSSProperties = {
@@ -26,7 +27,7 @@ const TH: React.CSSProperties = {
 }
 
 
-export default function UserTable({ users, activeFilter, onAssign, onRemove, onToggle }: Props) {
+export default function UserTable({ users, activeFilter, onAssign, onRemove, onToggle, onDelete }: Props) {
   const [query, setQuery] = useState("")
 
   // activeFilter from stat card takes precedence; local pill is secondary search
@@ -36,6 +37,7 @@ export default function UserTable({ users, activeFilter, onAssign, onRemove, onT
       u.email?.toLowerCase().includes(query.toLowerCase())
     const matchR =
       activeFilter === "all"     ? true :
+      activeFilter === "pending" ? isEffectivelyPending(u) :
       activeFilter === "no-role" ? u.roles.length === 0 :
       u.roles.includes(activeFilter)
     return matchQ && matchR
@@ -85,22 +87,23 @@ export default function UserTable({ users, activeFilter, onAssign, onRemove, onT
           <tr>
             <th style={TH}>User</th>
             <th style={TH}>Roles</th>
+            <th style={TH}>Actions</th>
             <th style={TH}>Joined</th>
             <th style={TH}>Status</th>
-            <th style={TH}>Actions</th>
+            <th style={TH}>Delete</th>
           </tr>
         </thead>
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan={5} style={{ padding: "48px", textAlign: "center", fontSize: 13, color: "#475569" }}>
+              <td colSpan={6} style={{ padding: "48px", textAlign: "center", fontSize: 13, color: "#475569" }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
                 No users match your search
               </td>
             </tr>
           ) : (
             filtered.map(u => (
-              <UserRow key={u.id} user={u} onAssign={onAssign} onRemove={onRemove} onToggle={onToggle} />
+              <UserRow key={u.id} user={u} onAssign={onAssign} onRemove={onRemove} onToggle={onToggle} onDelete={onDelete} />
             ))
           )}
         </tbody>

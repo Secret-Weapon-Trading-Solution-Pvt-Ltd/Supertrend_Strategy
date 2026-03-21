@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends
 from api.admin.auth           import require_admin
 from api.admin.keycloak_client import (
     assign_role,
+    delete_user,
     ensure_pending_default_role,
     get_admin_token,
     list_users,
@@ -50,6 +51,13 @@ async def api_set_status(user_id: str, body: dict):
     token   = await get_admin_token()
     await set_user_enabled(token, user_id, enabled)
     return {"user_id": user_id, "enabled": enabled}
+
+
+@router.delete("/users/{user_id}")
+async def api_delete_user(user_id: str):
+    token = await get_admin_token()
+    await delete_user(token, user_id)
+    return {"deleted": user_id}
 
 
 @router.post("/setup-realm")

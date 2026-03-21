@@ -20,6 +20,14 @@ interface State {
   error:   string | null
 }
 
+export const MANAGED_ROLES = ["admin", "approve", "revoke", "pending"] as const
+
+/** A user is effectively pending if they have the 'pending' role OR no managed roles at all. */
+export function isEffectivelyPending(user: AdminUser): boolean {
+  return user.roles.includes("pending") ||
+    !user.roles.some(r => MANAGED_ROLES.includes(r as typeof MANAGED_ROLES[number]))
+}
+
 export function useAdminUsers() {
   const { token } = useAuth()
   const [state, setState] = useState<State>({ users: [], loading: true, error: null })
@@ -38,7 +46,15 @@ export function useAdminUsers() {
     }
   }, [token])
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  // On mount: ensure 'pending' is set as the default realm role for new registrations
+  useEffect(() => {
+    fetch("/api/admin/setup-realm", {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {/* silent — setup already done or non-critical */})
+
+    fetchUsers()
+  }, [fetchUsers, token])
 
   const assignRole = async (userId: string, role: string) => {
     await fetch(`/api/admin/users/${userId}/roles`, {
@@ -66,5 +82,13 @@ export function useAdminUsers() {
     fetchUsers()
   }
 
-  return { ...state, refresh: fetchUsers, assignRole, removeRole, setEnabled }
+  const deleteUser = async (userId: string) => {
+    await fetch(`/api/admin/users/${userId}`, {
+      method:  "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    fetchUsers()
+  }
+
+  return { ...state, refresh: fetchUsers, assignRole, removeRole, setEnabled, deleteUser }
 }

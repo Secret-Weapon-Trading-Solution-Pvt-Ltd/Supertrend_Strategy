@@ -124,8 +124,8 @@ async def list_users(token: str) -> list[dict]:
         result = []
         for u in users:
             uid = u["id"]
-            # composite returns ALL effective roles including those from default-roles composites
-            rr = await client.get(f"{base}/users/{uid}/role-mappings/realm/composite", headers=h)
+            # Use direct roles only — composite would bleed inherited 'pending' onto approved users
+            rr = await client.get(f"{base}/users/{uid}/role-mappings/realm", headers=h)
             roles = _filter_roles(rr.json()) if rr.is_success else []
             result.append({
                 "id":        uid,
@@ -215,6 +215,19 @@ async def set_user_enabled(token: str, user_id: str, enabled: bool) -> None:
         )
         if not rr.is_success:
             raise HTTPException(status_code=rr.status_code, detail=rr.text)
+
+
+async def delete_user(token: str, user_id: str) -> None:
+    """Permanently delete a Keycloak user."""
+    base = _base()
+    h    = _headers(token)
+
+    async with httpx.AsyncClient() as client:
+        rr = await client.delete(f"{base}/users/{user_id}", headers=h)
+        if not rr.is_success:
+            raise HTTPException(status_code=rr.status_code, detail=rr.text)
+
+    log.info("delete_user: user %s permanently deleted", user_id)
 
 
 # ── Private helpers ────────────────────────────────────────────────────────────

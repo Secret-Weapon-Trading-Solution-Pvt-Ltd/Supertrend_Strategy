@@ -1,19 +1,19 @@
 // components/admin/AdminPanel.tsx — Dark theme user management panel.
 
-import { useState }      from "react"
-import UserTable         from "./UserTable"
-import { useAdminUsers } from "../../hooks/useAdminUsers"
+import { useState }                          from "react"
+import UserTable                             from "./UserTable"
+import { useAdminUsers, isEffectivelyPending } from "../../hooks/useAdminUsers"
 
 const STATS = [
-  { key: "total",   filter: "all",     label: "Total Users", icon: "👤", accent: "#94a3b8", bg: "#1e293b",  border: "#334155" },
-  { key: "admins",  filter: "admin",   label: "Admins",      icon: "⛨",  accent: "#818cf8", bg: "#1e1b4b", border: "#312e81" },
-  { key: "approve", filter: "approve", label: "Approved",    icon: "✅", accent: "#34d399", bg: "#052e16", border: "#064e3b" },
-  { key: "revoke",  filter: "revoke",  label: "Revoked",     icon: "🚫", accent: "#f87171", bg: "#1a0505", border: "#7f1d1d" },
   { key: "pending", filter: "pending", label: "Pending",     icon: "⏳", accent: "#fbbf24", bg: "#1c1500", border: "#451a03" },
+  { key: "approve", filter: "approve", label: "Approved",    icon: "✅", accent: "#34d399", bg: "#052e16", border: "#064e3b" },
+  { key: "admins",  filter: "admin",   label: "Admins",      icon: "⛨",  accent: "#818cf8", bg: "#1e1b4b", border: "#312e81" },
+  { key: "revoke",  filter: "revoke",  label: "Revoked",     icon: "🚫", accent: "#f87171", bg: "#1a0505", border: "#7f1d1d" },
+  { key: "total",   filter: "all",     label: "Total Users", icon: "👤", accent: "#94a3b8", bg: "#1e293b",  border: "#334155" },
 ]
 
 export default function AdminPanel() {
-  const { users, loading, error, assignRole, removeRole, setEnabled } = useAdminUsers()
+  const { users, loading, error, assignRole, removeRole, setEnabled, deleteUser } = useAdminUsers()
   const [activeFilter, setActiveFilter] = useState("all")
 
   const counts: Record<string, number> = {
@@ -21,7 +21,8 @@ export default function AdminPanel() {
     admins:  users.filter(u => u.roles.includes("admin")).length,
     approve: users.filter(u => u.roles.includes("approve")).length,
     revoke:  users.filter(u => u.roles.includes("revoke")).length,
-    pending: users.filter(u => u.roles.includes("pending")).length,
+    // count pending role OR no managed roles (new user before setup-realm ran)
+    pending: users.filter(isEffectivelyPending).length,
   }
 
   const handleStatClick = (filter: string) => {
@@ -143,6 +144,7 @@ export default function AdminPanel() {
             onAssign={assignRole}
             onRemove={removeRole}
             onToggle={setEnabled}
+            onDelete={deleteUser}
           />
         )}
       </div>

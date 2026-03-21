@@ -89,30 +89,6 @@ export default function AdminPanel() {
         })}
       </div>
 
-      {/* Active filter banner */}
-      {activeFilter !== "all" && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "12px 18px", borderRadius: 10,
-          background: "#1e293b", border: "1px solid #334155",
-        }}>
-          <span style={{ fontSize: 14, color: "#94a3b8" }}>
-            Showing <strong style={{ color: "#e2e8f0" }}>{activeFilter}</strong> users
-            {" "}·{" "}
-            <span style={{ color: "#818cf8" }}>{counts[activeFilter] ?? 0} found</span>
-          </span>
-          <button
-            onClick={() => setActiveFilter("all")}
-            style={{
-              fontSize: 13, color: "#64748b", background: "transparent",
-              border: "none", cursor: "pointer", padding: "3px 10px",
-              borderRadius: 6,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
-          >✕ Clear filter</button>
-        </div>
-      )}
 
       {/* Table card */}
       <div style={{

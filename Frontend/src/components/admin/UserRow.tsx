@@ -17,6 +17,7 @@ interface Props {
 const BTN: Record<string, React.CSSProperties> = {
   green:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #064e3b", background: "#052e16", color: "#34d399", transition: "all 0.15s" },
   red:    { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", transition: "all 0.15s" },
+  orange: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #92400e", background: "#1c0900", color: "#fb923c", transition: "all 0.15s" },
   indigo: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #312e81", background: "#1e1b4b", color: "#818cf8", transition: "all 0.15s" },
   ghost:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #334155", background: "transparent", color: "#64748b", transition: "all 0.15s" },
 }
@@ -24,6 +25,7 @@ const BTN: Record<string, React.CSSProperties> = {
 const HOVER: Record<string, Partial<React.CSSProperties>> = {
   green:  { background: "#064e3b" },
   red:    { background: "#7f1d1d" },
+  orange: { background: "#92400e" },
   indigo: { background: "#312e81" },
   ghost:  { color: "#94a3b8", borderColor: "#475569" },
 }
@@ -45,7 +47,7 @@ function getActions(
   const revoke      : ActionDef = { label: "✕ Revoke",      variant: "red",    onClick: () => onAssign(id, "revoke")  }
   const makeAdmin   : ActionDef = { label: "⛨ Make Admin",  variant: "indigo", onClick: () => onAssign(id, "admin")   }
   const removeAdmin : ActionDef = { label: "− Rem. Admin",  variant: "ghost",  onClick: () => onRemove(id, "admin")   }
-  const del         : ActionDef = { label: "🗑 Delete",      variant: "red",    onClick: () => onDelete(id)            }
+  const del         : ActionDef = { label: "🗑 Delete",      variant: "orange", onClick: () => onDelete(id)            }
 
   const effective = filter === "all"
     ? user.roles.includes("admin")   ? "admin"
@@ -124,9 +126,9 @@ export default function UserRow({ user, activeFilter, onAssign, onRemove, onDele
             <span style={{ fontSize: 13, color: "#f87171", whiteSpace: "nowrap", fontWeight: 600 }}>Delete user?</span>
             <button
               onClick={() => { onDelete(user.id); setConfirmDelete(false) }}
-              style={{ ...BTN.red, padding: "5px 12px" }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, HOVER.red)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: BTN.red.background })}
+              style={{ ...BTN.orange, padding: "5px 12px" }}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, HOVER.orange)}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: BTN.orange.background })}
             >Yes</button>
             <button
               onClick={() => setConfirmDelete(false)}

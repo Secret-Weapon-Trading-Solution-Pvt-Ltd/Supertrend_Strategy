@@ -106,22 +106,29 @@ export default function AdminSidebar({ page, setPage }: Props) {
           <button
             onClick={logout}
             style={{
-              width: "100%", padding: "13px 18px",
-              background: "#1a0a0a",
+              width: "100%", padding: "14px 20px",
+              background: "linear-gradient(135deg, #1a0505, #2d0a0a)",
               border: "none", borderTop: "1px solid #7f1d1d",
-              color: "#f87171", fontSize: 14, fontWeight: 600,
+              color: "#fca5a5", fontSize: 14, fontWeight: 700,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-              transition: "background 0.15s",
+              transition: "all 0.2s", letterSpacing: "0.3px",
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#27131a")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#1a0a0a")}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "linear-gradient(135deg, #7f1d1d, #991b1b)"
+              e.currentTarget.style.color = "#fff"
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "linear-gradient(135deg, #1a0505, #2d0a0a)"
+              e.currentTarget.style.color = "#fca5a5"
+            }}
           >
             <span style={{
-              width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-              background: "#7f1d1d",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
+              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+              background: "linear-gradient(135deg, #7f1d1d, #b91c1c)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, boxShadow: "0 2px 8px rgba(185,28,28,0.4)",
             }}>⇥</span>
-            Sign out
+            Sign Out
           </button>
         )}
 

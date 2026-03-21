@@ -20,7 +20,7 @@ const BTN: Record<string, React.CSSProperties> = {
   red:    { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #7f1d1d", background: "#1a0505",  color: "#f87171", transition: "all 0.15s" },
   rose:   { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #9d174d", background: "#2d0a1e",  color: "#fb7185", transition: "all 0.15s" },
   indigo: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #312e81", background: "#1e1b4b",  color: "#818cf8", transition: "all 0.15s" },
-  amber:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #78350f", background: "#1c0f00",  color: "#fbbf24", transition: "all 0.15s" },
+  blue:   { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #1e40af", background: "#0c1a3a",  color: "#60a5fa", transition: "all 0.15s" },
   ghost:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #334155", background: "transparent", color: "#64748b", transition: "all 0.15s" },
 }
 
@@ -29,7 +29,7 @@ const HOVER: Record<string, Partial<React.CSSProperties>> = {
   red:    { background: "#7f1d1d" },
   rose:   { background: "#9d174d" },
   indigo: { background: "#312e81" },
-  amber:  { background: "#78350f" },
+  blue:   { background: "#1e40af" },
   ghost:  { color: "#94a3b8", borderColor: "#475569" },
 }
 
@@ -50,7 +50,7 @@ function getActions(
   const approve     : ActionDef = { label: "✓ Approve",       variant: "green",  onClick: () => onAssign(id, "approve") }
   const revoke      : ActionDef = { label: "✕ Revoke",        variant: "red",    onClick: () => onAssign(id, "revoke")  }
   const makeAdmin   : ActionDef = { label: "⛨ Make Admin",    variant: "indigo", onClick: () => onAssign(id, "admin")   }
-  const removeAdmin : ActionDef = { label: "✕ Remove Admin",  variant: "amber",  onClick: () => onRemove(id, "admin")   }
+  const removeAdmin : ActionDef = { label: "✕ Remove Admin",  variant: "blue",   onClick: () => onRemove(id, "admin")   }
   const del         : ActionDef = { label: "🗑 Delete",        variant: "rose",   onClick: () => onDelete(id)            }
 
   // For "all" filter, derive effective category from user's actual roles

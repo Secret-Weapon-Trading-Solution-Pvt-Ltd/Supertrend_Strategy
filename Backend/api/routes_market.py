@@ -42,12 +42,14 @@ async def search_instruments(
     db:       AsyncSession   = Depends(get_db),
 ):
     """Search instruments by trading symbol or company name."""
-    pattern = f"%{query.strip()}%"
+    q = query.strip()
+    sym_pattern  = f"{q}%"   # starts-with for symbol — NIFTY matches NIFTY* not BANKNIFTY
+    name_pattern = f"{q}%"   # starts-with for name   — NIFTY matches name=NIFTY not name=BANKNIFTY
 
     stmt = select(Instrument).where(
         or_(
-            Instrument.tradingsymbol.ilike(pattern),
-            Instrument.name.ilike(pattern),
+            Instrument.tradingsymbol.ilike(sym_pattern),
+            Instrument.name.ilike(name_pattern),
         )
     )
 

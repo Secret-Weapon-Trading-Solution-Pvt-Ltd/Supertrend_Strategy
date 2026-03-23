@@ -249,6 +249,15 @@
     background: var(--blue-bg); color: var(--blue);
     border: 1px solid var(--blue-bdr); white-space: nowrap;
   }
+  .drop-type {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  }
+  .drop-type.CE { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bdr); }
+  .drop-type.PE { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-bdr);   }
+  .drop-type.FUT{ background: var(--orange-bg);color: var(--orange);border: 1px solid var(--orange-bdr);}
+  .drop-type.EQ { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-bdr);  }
+  .drop-meta { font-size: 11px; color: var(--text2); white-space: nowrap; }
   .drop-msg { padding: 14px; text-align: center; color: var(--text2); font-size: 12px; }
 
   /* Selected symbol */
@@ -1027,38 +1036,25 @@ const symClearBtn  = document.getElementById('symClearBtn');
 const tfSelect     = document.getElementById('tfSelect');
 
 // ══════════════════════════════════════
-//  AUTH — Keycloak token from localStorage
+//  AUTH — check Zerodha session via /status
 // ══════════════════════════════════════
-function getToken() {
-  return localStorage.getItem('swts_token');
-}
-
 function authFetch(url, options = {}) {
-  const token = getToken();
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-  });
+  return fetch(url, options);
 }
 
 async function checkLogin() {
-  const token = getToken();
-  if (!token) {
-    window.location.href = '/';
-    return;
-  }
-  // Decode username from JWT payload (no signature verification needed here)
   try {
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const username = payload.preferred_username || payload.email || payload.sub || 'User';
+    const res  = await fetch('/status');
+    const data = await res.json();
+    if (!data.logged_in) {
+      window.location.href = '/';
+      return;
+    }
+    const username = data.user || data.user_id || 'User';
     userChip.style.display  = 'inline-flex';
     userChipLbl.textContent = username;
   } catch {
-    userChip.style.display  = 'inline-flex';
-    userChipLbl.textContent = 'User';
+    window.location.href = '/';
   }
 }
 
@@ -1229,7 +1225,6 @@ sioScript.onload = () => {
   console.log('[socket.io] script loaded, connecting via nginx proxy...');
   const socket = io('/', {
     transports: ['websocket', 'polling'],
-    auth: { token: getToken() },
   });
   APP.socket = socket;
   console.log('[socket.io] socket object created:', socket);

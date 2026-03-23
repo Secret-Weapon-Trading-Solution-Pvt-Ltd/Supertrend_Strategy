@@ -272,13 +272,7 @@ async def index(request: Request, request_token: str | None = None, status: str 
     if account:
         valid, result = zeroda.verify_token(account.access_token)
         if valid:
-            profile = result
-            return templates.TemplateResponse(request, "index.html", {
-                "logged_in":    True,
-                "user_name":    profile["user_name"],
-                "user_id":      profile["user_id"],
-                "access_token": account.access_token,
-            })
+            return RedirectResponse(url="/dashboard")
 
     return templates.TemplateResponse(request, "index.html", {
         "logged_in": False,

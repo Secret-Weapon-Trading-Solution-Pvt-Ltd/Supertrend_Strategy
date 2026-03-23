@@ -77,13 +77,6 @@ export default function AdminPanel() {
                   {s.label}
                 </div>
               </div>
-              {isActive && (
-                <div style={{
-                  marginLeft: "auto", fontSize: 11, color: s.accent,
-                  background: s.accent + "22", padding: "3px 8px",
-                  borderRadius: 6, fontWeight: 700,
-                }}>filtered</div>
-              )}
             </div>
           )
         })}

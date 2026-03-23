@@ -13,20 +13,23 @@ interface Props {
 }
 
 // ── Button style presets ────────────────────────────────────────────────────
+// green=approve  red=revoke  rose=delete  indigo=make-admin  amber=rem-admin
 
 const BTN: Record<string, React.CSSProperties> = {
-  green:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #064e3b", background: "#052e16", color: "#34d399", transition: "all 0.15s" },
-  red:    { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #7f1d1d", background: "#1a0505", color: "#f87171", transition: "all 0.15s" },
-  orange: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #92400e", background: "#1c0900", color: "#fb923c", transition: "all 0.15s" },
-  indigo: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #312e81", background: "#1e1b4b", color: "#818cf8", transition: "all 0.15s" },
+  green:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #064e3b", background: "#052e16",  color: "#34d399", transition: "all 0.15s" },
+  red:    { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #7f1d1d", background: "#1a0505",  color: "#f87171", transition: "all 0.15s" },
+  rose:   { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #9d174d", background: "#2d0a1e",  color: "#fb7185", transition: "all 0.15s" },
+  indigo: { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #312e81", background: "#1e1b4b",  color: "#818cf8", transition: "all 0.15s" },
+  blue:   { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #1e40af", background: "#0c1a3a",  color: "#60a5fa", transition: "all 0.15s" },
   ghost:  { padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #334155", background: "transparent", color: "#64748b", transition: "all 0.15s" },
 }
 
 const HOVER: Record<string, Partial<React.CSSProperties>> = {
   green:  { background: "#064e3b" },
   red:    { background: "#7f1d1d" },
-  orange: { background: "#92400e" },
+  rose:   { background: "#9d174d" },
   indigo: { background: "#312e81" },
+  blue:   { background: "#1e40af" },
   ghost:  { color: "#94a3b8", borderColor: "#475569" },
 }
 
@@ -41,27 +44,35 @@ function getActions(
   onRemove: (id: string, role: string) => void,
   onDelete: (id: string) => void,
 ): ActionDef[] {
-  const id = user.id
+  const id        = user.id
+  const hasAdmin  = user.roles.includes("admin")
 
-  const approve     : ActionDef = { label: "✓ Approve",     variant: "green",  onClick: () => onAssign(id, "approve") }
-  const revoke      : ActionDef = { label: "✕ Revoke",      variant: "red",    onClick: () => onAssign(id, "revoke")  }
-  const makeAdmin   : ActionDef = { label: "⛨ Make Admin",  variant: "indigo", onClick: () => onAssign(id, "admin")   }
-  const removeAdmin : ActionDef = { label: "− Rem. Admin",  variant: "ghost",  onClick: () => onRemove(id, "admin")   }
-  const del         : ActionDef = { label: "🗑 Delete",      variant: "orange", onClick: () => onDelete(id)            }
+  const approve     : ActionDef = { label: "✓ Approve",       variant: "green",  onClick: () => onAssign(id, "approve") }
+  const revoke      : ActionDef = { label: "✕ Revoke",        variant: "red",    onClick: () => onAssign(id, "revoke")  }
+  const makeAdmin   : ActionDef = { label: "⛨ Make Admin",    variant: "indigo", onClick: () => onAssign(id, "admin")   }
+  const removeAdmin : ActionDef = { label: "✕ Remove Admin",  variant: "blue",   onClick: () => onRemove(id, "admin")   }
+  const del         : ActionDef = { label: "🗑 Delete",        variant: "rose",   onClick: () => onDelete(id)            }
 
+  // For "all" filter, derive effective category from user's actual roles
   const effective = filter === "all"
-    ? user.roles.includes("admin")   ? "admin"
-    : user.roles.includes("approve") ? "approve"
-    : user.roles.includes("revoke")  ? "revoke"
+    ? hasAdmin                         ? "admin"
+    : user.roles.includes("approve")   ? "approve"
+    : user.roles.includes("revoke")    ? "revoke"
     : "pending"
     : filter
 
   switch (effective) {
-    case "approve": return [revoke, makeAdmin, del]
-    case "pending":  return [approve, revoke, makeAdmin, del]
-    case "admin":    return [revoke, removeAdmin, del]
-    case "revoke":   return [approve, del]
-    default:         return [approve, revoke, del]
+    case "approve":
+      // approve-only user → offer Make Admin; approve+admin → offer Remove Admin
+      return hasAdmin ? [revoke, removeAdmin, del] : [revoke, makeAdmin, del]
+    case "pending":
+      return [approve, revoke, makeAdmin, del]
+    case "admin":
+      return [revoke, removeAdmin, del]
+    case "revoke":
+      return [approve, del]
+    default:
+      return [approve, revoke, del]
   }
 }
 
@@ -123,17 +134,17 @@ export default function UserRow({ user, activeFilter, onAssign, onRemove, onDele
       <td style={{ padding: "16px 22px" }}>
         {confirmDelete ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#f87171", whiteSpace: "nowrap", fontWeight: 600 }}>Delete user?</span>
+            <span style={{ fontSize: 13, color: "#fb7185", whiteSpace: "nowrap", fontWeight: 600 }}>Delete user?</span>
             <button
               onClick={() => { onDelete(user.id); setConfirmDelete(false) }}
-              style={{ ...BTN.orange, padding: "5px 12px" }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, HOVER.orange)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: BTN.orange.background })}
-            >Yes</button>
+              style={{ ...BTN.rose, padding: "5px 12px" }}
+              onMouseEnter={e => Object.assign(e.currentTarget.style, HOVER.rose)}
+              onMouseLeave={e => Object.assign(e.currentTarget.style, { background: BTN.rose.background })}
+            >Yes, Delete</button>
             <button
               onClick={() => setConfirmDelete(false)}
               style={{ ...BTN.ghost, padding: "5px 12px" }}
-            >No</button>
+            >Cancel</button>
           </div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>

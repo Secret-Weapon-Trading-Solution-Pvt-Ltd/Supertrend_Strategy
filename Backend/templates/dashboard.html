@@ -645,9 +645,9 @@
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
     <div class="lc-icon">🔐</div>
-    <div class="lc-title">Not Connected to Zerodha</div>
-    <div class="lc-sub">You need to login with Zerodha before using the dashboard.</div>
-    <a href="/" class="lc-btn">Login with Zerodha</a>
+    <div class="lc-title">Session Expired</div>
+    <div class="lc-sub">Your session has expired. Please login again.</div>
+    <a href="/" class="lc-btn">Back to Login</a>
   </div>
 </div>
 
@@ -1027,21 +1027,38 @@ const symClearBtn  = document.getElementById('symClearBtn');
 const tfSelect     = document.getElementById('tfSelect');
 
 // ══════════════════════════════════════
-//  LOGIN CHECK
+//  AUTH — Keycloak token from localStorage
 // ══════════════════════════════════════
+function getToken() {
+  return localStorage.getItem('swts_token');
+}
+
+function authFetch(url, options = {}) {
+  const token = getToken();
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+}
+
 async function checkLogin() {
+  const token = getToken();
+  if (!token) {
+    window.location.href = '/';
+    return;
+  }
+  // Decode username from JWT payload (no signature verification needed here)
   try {
-    const res  = await fetch('/status');
-    const data = await res.json();
-    if (!data.logged_in) {
-      loginOverlay.classList.add('show');
-      return;
-    }
-    // Show user chip
-    userChip.style.display = 'inline-flex';
-    userChipLbl.textContent = data.user || data.user_id || 'Connected';
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const username = payload.preferred_username || payload.email || payload.sub || 'User';
+    userChip.style.display  = 'inline-flex';
+    userChipLbl.textContent = username;
   } catch {
-    loginOverlay.classList.add('show');
+    userChip.style.display  = 'inline-flex';
+    userChipLbl.textContent = 'User';
   }
 }
 
@@ -1050,7 +1067,7 @@ async function checkLogin() {
 // ══════════════════════════════════════
 async function loadTimeframes() {
   try {
-    const res  = await fetch('/api/timeframes');
+    const res  = await authFetch('/api/timeframes');
     const data = await res.json();
 
     tfSelect.innerHTML = `<option value="" disabled selected>Select timeframe...</option>`;
@@ -1209,9 +1226,10 @@ function setWs(connected) {
 const sioScript  = document.createElement('script');
 sioScript.src    = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
 sioScript.onload = () => {
-  console.log('[socket.io] script loaded, connecting to http://localhost:8000...');
-  const socket = io('http://localhost:8000', {
+  console.log('[socket.io] script loaded, connecting via nginx proxy...');
+  const socket = io('/', {
     transports: ['websocket', 'polling'],
+    auth: { token: getToken() },
   });
   APP.socket = socket;
   console.log('[socket.io] socket object created:', socket);
@@ -1356,7 +1374,7 @@ function onTick(data) {
 // ── Signals history ────────────────────────────────────────────────────────
 async function loadSignals() {
   try {
-    const res    = await fetch('/api/trades?limit=50');
+    const res    = await authFetch('/api/trades?limit=50');
     const trades = await res.json();
 
     if (!trades.length) {
@@ -1552,7 +1570,7 @@ const ftSummaryPanel = document.getElementById('ftSummaryPanel');
 
 async function loadFTSummary() {
   try {
-    const res  = await fetch('/api/forward/summary');
+    const res  = await authFetch('/api/forward/summary');
     const data = await res.json();
     if (!data.total_trades) return;
 
@@ -1701,7 +1719,7 @@ function positionRow(p) {
 async function loadHoldings() {
   holdingsBody.innerHTML = `<tr><td colspan="9" class="port-empty">Loading...</td></tr>`;
   try {
-    const res  = await fetch('/api/holdings');
+    const res  = await authFetch('/api/holdings');
     const data = await res.json();
     const list = data.holdings || [];
     if (!list.length) {
@@ -1719,7 +1737,7 @@ async function loadHoldings() {
 async function loadPositions() {
   positionsBody.innerHTML = `<tr><td colspan="8" class="port-empty">Loading...</td></tr>`;
   try {
-    const res  = await fetch('/api/positions');
+    const res  = await authFetch('/api/positions');
     const data = await res.json();
     const list = data.positions || [];
     if (!list.length) {
@@ -1739,7 +1757,7 @@ async function loadPositions() {
 async function refreshHoldingPrices() {
   if (!holdingsLoaded) return;
   try {
-    const res  = await fetch('/api/holdings');
+    const res  = await authFetch('/api/holdings');
     const data = await res.json();
     (data.holdings || []).forEach(h => {
       const row = holdingsBody.querySelector(`tr[data-symbol="${h.symbol}"]`);
@@ -1765,7 +1783,7 @@ async function refreshHoldingPrices() {
 async function refreshPositionPrices() {
   if (!positionsLoaded) return;
   try {
-    const res  = await fetch('/api/positions');
+    const res  = await authFetch('/api/positions');
     const data = await res.json();
     const list = data.positions || [];
 

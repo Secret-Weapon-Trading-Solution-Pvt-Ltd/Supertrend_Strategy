@@ -9,7 +9,7 @@ import { EVENTS } from '@/types/types'
 import type { Instrument } from '@/types/types'
 import type { ReactNode } from 'react'
 import { IndicatorsPanel } from '@/components/IndicatorsPanel'
-import { NavDrawer }      from '@/components/NavDrawer'
+import { LayoutNav }      from '@/components/LayoutNav'
 
 type ExTab   = 'NSE' | 'BSE' | 'NFO'
 type NfoType = 'FUT' | 'CE' | 'PE'
@@ -34,8 +34,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // ── Indicators panel ──────────────────────────────────────────────────────
   const [indOpen,  setIndOpen]  = useState(false)
 
-  // ── Nav drawer ────────────────────────────────────────────────────────────
-  const [navOpen,  setNavOpen]  = useState(false)
 
   // Close both dropdowns on outside click
   useEffect(() => {
@@ -78,17 +76,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* ══════════════════════ TOP BAR ═════════════════════════════════════ */}
       <header className="shrink-0 h-14 bg-white border-b border-slate-200 flex items-center px-5 gap-3">
-
-        {/* Hamburger */}
-        <button
-          onClick={() => setNavOpen(true)}
-          className="w-8 h-8 flex flex-col items-center justify-center gap-[5px] rounded-lg hover:bg-slate-100 transition-colors shrink-0"
-          aria-label="Open navigation"
-        >
-          <span className="w-4 h-[1.5px] bg-slate-600 rounded-full" />
-          <span className="w-4 h-[1.5px] bg-slate-600 rounded-full" />
-          <span className="w-4 h-[1.5px] bg-slate-600 rounded-full" />
-        </button>
 
         {/* Logo */}
         <span className="text-sm font-black tracking-[0.15em] text-slate-800 uppercase shrink-0">SWTS</span>
@@ -287,11 +274,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* ══════════════════════ PAGE CONTENT ════════════════════════════════ */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
+        <LayoutNav />
         {children}
       </div>
-
-      {/* ══════════════════════ NAV DRAWER ═══════════════════════════════════ */}
-      <NavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
 
       {/* ══════════════════════ INDICATORS PANEL ═════════════════════════════ */}
       <IndicatorsPanel open={indOpen} onClose={() => setIndOpen(false)} />

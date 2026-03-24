@@ -1,0 +1,73 @@
+'use client'
+
+// Root page — checks /status on load.
+// Logged in  → redirect to /dashboard
+// Logged out → show link to backend login
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { getStatus } from '@/lib/api'
+
+export default function HomePage() {
+  const router = useRouter()
+  const [checking, setChecking] = useState(true)
+  const [error, setError]       = useState('')
+
+  useEffect(() => {
+    getStatus()
+      .then(status => {
+        if (status.logged_in) {
+          router.replace('/dashboard')
+        } else {
+          setChecking(false)
+        }
+      })
+      .catch(err => {
+        setError(err.message || 'Could not reach backend')
+        setChecking(false)
+      })
+  }, [router])
+
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-slate-500">
+        Checking auth…
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="bg-white border border-slate-200 rounded-xl p-8 w-full max-w-sm text-center shadow-sm">
+        <h1 className="text-xl font-bold mb-1">SWTS</h1>
+        <p className="text-slate-500 text-sm mb-6">Supertrend Trading System</p>
+
+        {error && (
+          <p className="text-red-500 text-sm mb-4 bg-red-50 border border-red-200 rounded px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <p className="text-sm text-slate-600 mb-4">
+          Not logged in. Login via the backend — after OAuth completes, come back here.
+        </p>
+
+        <a
+          href="http://localhost:8000"
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+        >
+          Login with Zerodha →
+        </a>
+
+        <button
+          onClick={() => { setChecking(true); setError(''); getStatus().then(s => { if (s.logged_in) router.replace('/dashboard'); else setChecking(false) }).catch(e => { setError(e.message); setChecking(false) }) }}
+          className="mt-3 text-sm text-blue-600 hover:underline"
+        >
+          I&apos;ve logged in — check again
+        </button>
+      </div>
+    </div>
+  )
+}

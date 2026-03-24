@@ -1,16 +1,173 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   SWTS — Tailwind v4 Theme
+   All design tokens live here. Reference them in JSX as Tailwind utilities:
+     font-sans / font-display / font-mono
+     text-ink / text-muted / text-subtle
+     bg-surface / bg-raised / bg-sunken
+     border-edge
+     text-profit / text-loss / bg-profit / bg-loss
+     text-brand / bg-brand-* / ring-brand
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+
+  /* ── Fonts ─────────────────────────────────────────────────────────────── */
+  --font-sans:    var(--font-inter),      ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta),    var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono:    var(--font-jetbrains),  ui-monospace, "Fira Code", monospace;
+
+  /* ── Font sizes ─────────────────────────────────────────────────────────── */
+  /* Slightly larger base than Tailwind default for trading readability */
+  --font-size-2xs:  0.65rem;   /* 10.4px — tiny labels */
+  --font-size-xs:   0.75rem;   /* 12px   — badges, captions */
+  --font-size-sm:   0.8125rem; /* 13px   — secondary text */
+  --font-size-base: 0.9375rem; /* 15px   — body (bigger than TW default 16px) */
+  --font-size-lg:   1.0625rem; /* 17px */
+  --font-size-xl:   1.25rem;   /* 20px */
+  --font-size-2xl:  1.5rem;    /* 24px */
+  --font-size-3xl:  1.875rem;  /* 30px */
+  --font-size-4xl:  2.25rem;   /* 36px  — big P&L numbers */
+  --font-size-5xl:  3rem;      /* 48px  — hero stats */
+
+  /* ── Brand — Blue ───────────────────────────────────────────────────────── */
+  --color-brand-50:  #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  /* ── Surfaces (light theme) ─────────────────────────────────────────────── */
+  --color-surface:        #ffffff;   /* cards, panels */
+  --color-raised:         #f8fafc;   /* page background */
+  --color-sunken:         #f1f5f9;   /* inputs, inset areas */
+  --color-overlay:        #ffffff;   /* modals, popovers */
+
+  /* ── Borders ────────────────────────────────────────────────────────────── */
+  --color-edge:           #e2e8f0;   /* default border */
+  --color-edge-strong:    #cbd5e1;   /* stronger dividers */
+
+  /* ── Text hierarchy ─────────────────────────────────────────────────────── */
+  --color-ink:            #0f172a;   /* headings, important numbers */
+  --color-ink-secondary:  #334155;   /* body text */
+  --color-muted:          #64748b;   /* secondary labels */
+  --color-subtle:         #94a3b8;   /* placeholder, disabled */
+  --color-ghost:          #cbd5e1;   /* very faint */
+
+  /* ── Semantic — Profit / Loss ───────────────────────────────────────────── */
+  --color-profit:         #059669;   /* emerald-600 */
+  --color-profit-light:   #10b981;   /* emerald-500 */
+  --color-profit-bg:      #ecfdf5;   /* emerald-50 */
+  --color-profit-border:  #a7f3d0;   /* emerald-200 */
+
+  --color-loss:           #dc2626;   /* red-600 */
+  --color-loss-light:     #ef4444;   /* red-500 */
+  --color-loss-bg:        #fef2f2;   /* red-50 */
+  --color-loss-border:    #fecaca;   /* red-200 */
+
+  /* ── Semantic — Warning ─────────────────────────────────────────────────── */
+  --color-warn:           #d97706;   /* amber-600 */
+  --color-warn-bg:        #fffbeb;
+  --color-warn-border:    #fde68a;
+
+  /* ── Page accent colors (one per route) ────────────────────────────────── */
+  /* Trading page  → brand blue (above)                                       */
+  /* Trades page   → teal/emerald                                             */
+  --color-trades-500:     #14b8a6;
+  --color-trades-600:     #0d9488;
+  --color-trades-100:     #ccfbf1;
+  --color-trades-50:      #f0fdfa;
+
+  /* Portfolio page → violet                                                  */
+  --color-portfolio-500:  #8b5cf6;
+  --color-portfolio-600:  #7c3aed;
+  --color-portfolio-100:  #ede9fe;
+  --color-portfolio-50:   #f5f3ff;
+
+  /* Settings page  → slate/indigo                                            */
+  --color-settings-500:   #6366f1;
+  --color-settings-600:   #4f46e5;
+  --color-settings-100:   #e0e7ff;
+  --color-settings-50:    #eef2ff;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+  --shadow-card:   0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-modal:  0 20px 60px -10px rgb(0 0 0 / 0.18), 0 4px 16px -4px rgb(0 0 0 / 0.1);
+  --shadow-pop:    0 4px 24px -4px rgb(0 0 0 / 0.12), 0 1px 4px -1px rgb(0 0 0 / 0.08);
+
+  /* ── Radius ─────────────────────────────────────────────────────────────── */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
+  --radius-2xl:  24px;
+  --radius-pill: 9999px;
+
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Base resets
+   ───────────────────────────────────────────────────────────────────────────── */
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   height: 100%;
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-  font-size: 14px;
+  background:  var(--color-raised);
+  color:       var(--color-ink);
+  font-family: var(--font-sans);
+  font-size:   14px;
+  -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar        { width: 5px; height: 5px; }
+/* ─────────────────────────────────────────────────────────────────────────────
+   Scrollbar
+   ───────────────────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb  { background: var(--color-edge-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Animations
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+.animate-in {
+  animation: modal-in 0.15s ease-out forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.animate-slide-up {
+  animation: slide-up 0.18s ease-out forwards;
+}
+
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(-100%); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+.animate-slide-right {
+  animation: slide-right 0.2s ease-out forwards;
+}

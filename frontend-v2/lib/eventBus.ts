@@ -35,6 +35,8 @@ import type {
   ModeSwitchPayload,
   IndicatorTogglePayload,
   IndicatorSettingsPayload,
+  IndicatorStatePayload,
+  IndicatorSettingsAppliedPayload,
   TickPayload,
   SignalBuyPayload,
   OrderPlacedPayload,
@@ -54,9 +56,9 @@ export interface EventPayloadMap {
 
   // ── Engine commands (UI → socket) ───────────────────────────────────────────
   ENGINE_START:          EngineStartPayload
-  ENGINE_STOP:           void
-  ENGINE_PAUSE:          void
-  ENGINE_RESUME:         void
+  ENGINE_STOP:           undefined
+  ENGINE_PAUSE:          undefined
+  ENGINE_RESUME:         undefined
 
   // ── Mode ────────────────────────────────────────────────────────────────────
   MODE_CHANGED:          ModeSwitchPayload
@@ -72,17 +74,19 @@ export interface EventPayloadMap {
   EXIT_TRIGGERED:        ExitTriggeredPayload
   POSITION_UPDATE:       PositionUpdatePayload
   ENGINE_STATE_CHANGED:  EngineStatePayload
-  INDICATORS_DATA:       IndicatorsDataPayload
-  LOG_RECEIVED:          LogPayload
-  MODE_STATE:            ModeStatePayload
-  SOCKET_ERROR:          ErrorPayload
+  INDICATORS_DATA:            IndicatorsDataPayload
+  LOG_RECEIVED:               LogPayload
+  INDICATOR_STATE:            IndicatorStatePayload
+  INDICATOR_SETTINGS_APPLIED: IndicatorSettingsAppliedPayload
+  MODE_STATE:                 ModeStatePayload
+  SOCKET_ERROR:               ErrorPayload
 
   // ── Connection ──────────────────────────────────────────────────────────────
-  WS_CONNECTED:          void
-  WS_DISCONNECTED:       void
+  WS_CONNECTED:          undefined
+  WS_DISCONNECTED:       undefined
 
   // ── State control ───────────────────────────────────────────────────────────
-  RESET_MARKET_DATA:     void
+  RESET_MARKET_DATA:     undefined
 }
 
 // ── EventBus class ────────────────────────────────────────────────────────────

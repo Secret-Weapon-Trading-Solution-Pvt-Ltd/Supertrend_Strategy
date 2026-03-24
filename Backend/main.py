@@ -391,12 +391,17 @@ async def on_engine_start(sid, data: dict):
         return
 
     try:
-        # If same symbol is already running/paused/stopped → just resume (no new thread)
+        # If same symbol is already running/paused/stopped → resume or restart in-place (no new thread)
         if _engine and _engine.instrument_token == int(token) and _engine._thread and _engine._thread.is_alive():
             _engine.qty = int(qty)
-            _engine.resume()
+            if _engine.state.value == "STOPPED":
+                from engine.trading_engine import EngineState
+                _engine.state = EngineState.RUNNING
+                log.info("Engine restarted from STOPPED: %s qty=%d", symbol, qty)
+            else:
+                _engine.resume()
+                log.info("Engine resumed: %s qty=%d", symbol, qty)
             await emit("engine:state", _engine.status())
-            log.info("Engine resumed: %s qty=%d", symbol, qty)
             return
 
         # Kill old thread if it exists (different symbol or dead thread)

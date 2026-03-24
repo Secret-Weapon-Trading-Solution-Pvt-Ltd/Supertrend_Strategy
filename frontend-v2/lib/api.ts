@@ -31,9 +31,10 @@ import type {
 } from '@/types/types'
 
 // ── Axios instance ────────────────────────────────────────────────────────────
-// In dev: requests go to Next.js which proxies to backend via next.config.ts
-// In prod: set NEXT_PUBLIC_BACKEND_URL in .env.local
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+// In dev:  BASE_URL is '' (empty) → requests use relative paths → Next.js
+//          rewrites them to http://localhost:8000 via next.config.ts.
+// In prod: set NEXT_PUBLIC_BACKEND_URL=https://your-api.example.com in .env.local
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || ''
 
 const api = axios.create({
   baseURL: BASE_URL,

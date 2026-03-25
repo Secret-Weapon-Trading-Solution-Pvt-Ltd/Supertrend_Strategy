@@ -112,7 +112,7 @@ export function LayoutNav() {
 
       {/* Footer */}
       <div className="shrink-0 px-4 py-3 border-t border-edge">
-        <p className="text-2xs text-ghost">Supertrend Trading System</p>
+        <p className="text-2xs text-ghost">Supertrend & ATR Trading System</p>
       </div>
     </nav>
   )

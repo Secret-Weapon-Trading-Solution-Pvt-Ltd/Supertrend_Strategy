@@ -65,7 +65,7 @@ export function IndicatorsPanel({ open, onClose }: Props) {
           </div>
 
           {/* Content */}
-          <div className="p-5 flex flex-col gap-3">
+          <div className="p-5 flex flex-col gap-3 overflow-y-auto">
 
             {/* Supertrend */}
             <IndicatorCard

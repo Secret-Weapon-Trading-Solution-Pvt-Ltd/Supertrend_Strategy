@@ -27,7 +27,7 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'SWTS — Supertrend Trading System',
+  title: 'TrendEdge — Supertrend & ATR Trading System',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -39,8 +39,15 @@ export default function HomePage() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="bg-white border border-slate-200 rounded-xl p-8 w-full max-w-sm text-center shadow-sm">
-        <h1 className="text-xl font-bold mb-1">SWTS</h1>
-        <p className="text-slate-500 text-sm mb-6">Supertrend Trading System</p>
+        <div className="flex items-center justify-center gap-2.5 mb-1">
+          <svg viewBox="0 0 36 36" fill="none" className="w-8 h-8 shrink-0">
+            <rect width="36" height="36" rx="9" fill="#2563eb"/>
+            <polyline points="7,26 13,18 20,21 29,11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="29" cy="11" r="2.5" fill="white"/>
+          </svg>
+          <h1 className="text-xl font-bold">TrendEdge</h1>
+        </div>
+        <p className="text-slate-500 text-sm mb-6">Supertrend & ATR Trading System</p>
 
         {error && (
           <p className="text-red-500 text-sm mb-4 bg-red-50 border border-red-200 rounded px-3 py-2">

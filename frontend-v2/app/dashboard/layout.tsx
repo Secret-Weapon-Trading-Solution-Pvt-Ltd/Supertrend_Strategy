@@ -50,8 +50,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <header className="shrink-0 h-16 bg-white border-b border-slate-200 flex items-center gap-2">
 
         {/* Logo — same width as sidebar so controls align above content */}
-        <div className="w-72 shrink-0 flex items-center px-5 border-r border-slate-200 h-full select-none">
-          <span className="font-display text-xl font-black tracking-[0.22em] text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400 uppercase">SWTS</span>
+        <div className="w-72 shrink-0 flex items-center gap-3 px-5 border-r border-slate-200 h-full select-none">
+          <svg viewBox="0 0 36 36" fill="none" className="w-8 h-8 shrink-0">
+            <rect width="36" height="36" rx="9" fill="#2563eb"/>
+            <polyline points="7,26 13,18 20,21 29,11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="29" cy="11" r="2.5" fill="white"/>
+          </svg>
+          <span className="font-display text-xl font-black tracking-[0.22em] text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400 uppercase">TrendEdge</span>
         </div>
 
         {/* ── Controls — starts exactly where content starts ────────────────── */}

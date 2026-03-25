@@ -60,7 +60,8 @@ function getSocket(): Socket {
   if (!socket) {
     socket = io(BACKEND_URL, {
       autoConnect:          false,
-      transports:           ['websocket'],  // skip long-polling, go straight to WS
+      transports:           ['websocket', 'polling'],  // WS first, fall back to polling
+      upgrade:              true,
       reconnection:         true,
       reconnectionDelay:    1000,
       reconnectionDelayMax: 5000,

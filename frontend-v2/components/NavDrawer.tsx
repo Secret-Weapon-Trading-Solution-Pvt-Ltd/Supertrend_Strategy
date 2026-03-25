@@ -91,7 +91,14 @@ export function NavDrawer({ open, onClose }: Props) {
 
         {/* Header */}
         <div className="shrink-0 h-14 flex items-center justify-between px-5 border-b border-edge">
-          <span className="font-display text-base font-black tracking-[0.15em] text-ink uppercase">SWTS</span>
+          <div className="flex items-center gap-2.5">
+            <svg viewBox="0 0 36 36" fill="none" className="w-7 h-7 shrink-0">
+              <rect width="36" height="36" rx="9" fill="#2563eb"/>
+              <polyline points="7,26 13,18 20,21 29,11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="29" cy="11" r="2.5" fill="white"/>
+            </svg>
+            <span className="font-display text-base font-black tracking-[0.15em] text-ink uppercase">TrendEdge</span>
+          </div>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-sunken transition-colors"
@@ -140,7 +147,7 @@ export function NavDrawer({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="shrink-0 px-5 py-4 border-t border-edge">
-          <p className="text-xs text-subtle">Supertrend Trading System</p>
+          <p className="text-xs text-subtle">Supertrend & ATR Trading System</p>
         </div>
       </div>
     </>

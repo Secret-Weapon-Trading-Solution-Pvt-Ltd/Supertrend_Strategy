@@ -25,19 +25,34 @@ export default function TradesPage() {
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 px-8 py-6"
+        className="shrink-0 px-8 py-6 relative overflow-hidden"
         style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
       >
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-1"
-              style={{ color: 'var(--theme-accent)' }}>
-              History
-            </p>
-            <h1 className="font-display text-3xl font-bold"
-              style={{ color: 'var(--theme-text-primary)' }}>
-              Trade Log
-            </h1>
+        {/* Glow decoration */}
+        <div className="absolute -top-6 -left-6 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: 'var(--theme-accent-soft)', filter: 'blur(40px)', opacity: 0.6 }} />
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Icon box */}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--theme-accent-soft)', border: '1px solid var(--theme-accent-border)', boxShadow: 'var(--theme-accent-glow)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6"
+                style={{ color: 'var(--theme-accent)' }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 21V9" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-1"
+                style={{ color: 'var(--theme-accent)' }}>
+                History
+              </p>
+              <h1 className="font-display text-3xl font-bold"
+                style={{ color: 'var(--theme-text-primary)' }}>
+                Trade Log
+              </h1>
+            </div>
           </div>
           <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
             {trades.length} completed trade{trades.length !== 1 ? 's' : ''}

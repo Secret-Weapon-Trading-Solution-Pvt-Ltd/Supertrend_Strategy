@@ -27,19 +27,35 @@ export default function PortfolioPage() {
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 px-8 py-6"
+        className="shrink-0 px-8 py-6 relative overflow-hidden"
         style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
       >
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-1"
-              style={{ color: 'var(--theme-accent)' }}>
-              Account
-            </p>
-            <h1 className="font-display text-3xl font-bold"
-              style={{ color: 'var(--theme-text-primary)' }}>
-              Portfolio
-            </h1>
+        {/* Glow decoration */}
+        <div className="absolute -top-6 -left-6 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: 'var(--theme-accent-soft)', filter: 'blur(40px)', opacity: 0.6 }} />
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Icon box */}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--theme-accent-soft)', border: '1px solid var(--theme-accent-border)', boxShadow: 'var(--theme-accent-glow)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6"
+                style={{ color: 'var(--theme-accent)' }}>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-1"
+                style={{ color: 'var(--theme-accent)' }}>
+                Account
+              </p>
+              <h1 className="font-display text-3xl font-bold"
+                style={{ color: 'var(--theme-text-primary)' }}>
+                Portfolio
+              </h1>
+            </div>
           </div>
           <span
             className="text-xs font-bold px-3 py-1.5 rounded-full"

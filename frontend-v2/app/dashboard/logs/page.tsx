@@ -18,19 +18,37 @@ export default function LogsPage() {
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 px-8 py-6"
+        className="shrink-0 px-8 py-6 relative overflow-hidden"
         style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
       >
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-1"
-              style={{ color: 'var(--theme-accent)' }}>
-              System
-            </p>
-            <h1 className="font-display text-3xl font-bold"
-              style={{ color: 'var(--theme-text-primary)' }}>
-              Logs
-            </h1>
+        {/* Glow decoration */}
+        <div className="absolute -top-6 -left-6 w-40 h-40 rounded-full pointer-events-none"
+          style={{ background: 'var(--theme-accent-soft)', filter: 'blur(40px)', opacity: 0.6 }} />
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Icon box */}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--theme-accent-soft)', border: '1px solid var(--theme-accent-border)', boxShadow: 'var(--theme-accent-glow)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6"
+                style={{ color: 'var(--theme-accent)' }}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-1"
+                style={{ color: 'var(--theme-accent)' }}>
+                System
+              </p>
+              <h1 className="font-display text-3xl font-bold"
+                style={{ color: 'var(--theme-text-primary)' }}>
+                Logs
+              </h1>
+            </div>
           </div>
           <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
             {logs.length} entries

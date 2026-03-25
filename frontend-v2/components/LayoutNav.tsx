@@ -76,6 +76,43 @@ export function LayoutNav() {
   return (
     <nav className="glass-panel shrink-0 w-72 flex flex-col overflow-y-auto">
 
+      {/* Brand */}
+      <div
+        className="shrink-0 px-5 py-4 flex items-center gap-3"
+        style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
+      >
+        {/* Logo icon */}
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            background: 'var(--theme-accent-soft)',
+            border:     '1px solid var(--theme-accent-border)',
+          }}
+        >
+          <svg viewBox="0 0 28 28" fill="none" className="w-5 h-5">
+            <polyline
+              points="2,20 8,13 14,16 22,7"
+              stroke="var(--theme-accent)" strokeWidth="2.2"
+              strokeLinecap="round" strokeLinejoin="round"
+            />
+            <circle cx="22" cy="7" r="2.5" fill="var(--theme-accent)" />
+            <polyline
+              points="2,24 6,20 10,22 16,17 22,19"
+              stroke="var(--theme-profit)" strokeWidth="1.4"
+              strokeLinecap="round" strokeLinejoin="round"
+              opacity="0.6"
+            />
+          </svg>
+        </div>
+
+        <p
+          className="font-display text-xl font-black tracking-widest"
+          style={{ color: 'var(--theme-accent)' }}
+        >
+          TrendEdge
+        </p>
+      </div>
+
       {/* Nav items */}
       <div className="flex-1 p-3 flex flex-col gap-1">
         {NAV.map(item => {

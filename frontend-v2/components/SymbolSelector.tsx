@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { searchInstruments } from '@/lib/api'
 import type { Instrument } from '@/types/types'
 
@@ -108,20 +109,20 @@ export function SymbolSelector({ selected, onSelect }: Props) {
         </svg>
       </button>
 
-      {/* ── Modal panel ────────────────────────────────────────────────────── */}
-      {open && (
+      {/* ── Modal panel — portalled to <body> to escape strip stacking context ── */}
+      {open && typeof document !== 'undefined' && createPortal(
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-40 backdrop-blur-sm"
+            className="fixed inset-0 z-[200] backdrop-blur-sm"
             style={{ background: 'rgba(0,0,0,0.55)' }}
             onClick={() => setOpen(false)}
           />
 
-          {/* Panel */}
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg animate-in">
+          {/* Centred panel wrapper */}
+          <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
             <div
-              className="rounded-2xl overflow-hidden"
+              className="pointer-events-auto w-full max-w-lg rounded-2xl overflow-hidden animate-in"
               style={{
                 background:     'var(--theme-glass-topbar)',
                 border:         '1px solid var(--theme-glass-border-strong)',
@@ -325,7 +326,8 @@ export function SymbolSelector({ selected, onSelect }: Props) {
 
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   )

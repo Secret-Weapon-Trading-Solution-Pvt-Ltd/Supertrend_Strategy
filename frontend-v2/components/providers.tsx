@@ -7,18 +7,21 @@ import { AuthProvider }   from '@/store/AuthStore'
 import { EngineProvider } from '@/store/EngineStore'
 import { MarketProvider } from '@/store/MarketStore'
 import { TradeProvider }  from '@/store/TradeStore'
+import { ThemeProvider }  from '@/store/ThemeStore'
 import type { ReactNode } from 'react'
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
-      <EngineProvider>
-        <MarketProvider>
-          <TradeProvider>
-            {children}
-          </TradeProvider>
-        </MarketProvider>
-      </EngineProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <EngineProvider>
+          <MarketProvider>
+            <TradeProvider>
+              {children}
+            </TradeProvider>
+          </MarketProvider>
+        </EngineProvider>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

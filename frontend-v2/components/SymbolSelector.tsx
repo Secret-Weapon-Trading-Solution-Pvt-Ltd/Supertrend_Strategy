@@ -14,11 +14,11 @@ interface Props {
 
 const EXCHANGES: Exchange[] = ['NSE', 'BSE', 'NFO', 'MCX']
 
-const EXCHANGE_META: Record<Exchange, { color: string; bg: string; desc: string }> = {
-  NSE: { color: 'text-brand-600',     bg: 'bg-brand-50 border-brand-200',     desc: 'Equities' },
-  BSE: { color: 'text-amber-600',     bg: 'bg-amber-50 border-amber-200',     desc: 'Equities' },
-  NFO: { color: 'text-violet-600',    bg: 'bg-violet-50 border-violet-200',   desc: 'F&O' },
-  MCX: { color: 'text-emerald-600',   bg: 'bg-emerald-50 border-emerald-200', desc: 'Commodities' },
+const EXCHANGE_DESC: Record<Exchange, string> = {
+  NSE: 'Equities',
+  BSE: 'Equities',
+  NFO: 'F&O',
+  MCX: 'Commodities',
 }
 
 export function SymbolSelector({ selected, onSelect }: Props) {
@@ -31,7 +31,6 @@ export function SymbolSelector({ selected, onSelect }: Props) {
 
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-focus search when panel opens
   useEffect(() => {
     if (open) {
       setQuery('')
@@ -40,7 +39,6 @@ export function SymbolSelector({ selected, onSelect }: Props) {
     }
   }, [open])
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
@@ -53,11 +51,7 @@ export function SymbolSelector({ selected, onSelect }: Props) {
     if (q.trim().length < 2) { setResults([]); return }
     setSearching(true)
     try {
-      const params: Parameters<typeof searchInstruments>[0] = {
-        query: q.trim(),
-        exchange,
-        limit: 20,
-      }
+      const params: Parameters<typeof searchInstruments>[0] = { query: q.trim(), exchange, limit: 20 }
       if (exchange === 'NFO' || exchange === 'MCX') params.type = subType
       setResults(await searchInstruments(params))
     } catch { /* ignore */ }
@@ -77,50 +71,86 @@ export function SymbolSelector({ selected, onSelect }: Props) {
   }
 
   const showSubType = exchange === 'NFO' || exchange === 'MCX'
-  const meta = EXCHANGE_META[exchange]
 
   return (
     <>
       {/* ── Trigger button ─────────────────────────────────────────────────── */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-3 h-11 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all min-w-[240px] group"
+        className="flex items-center gap-3 h-11 px-4 rounded-xl transition-all min-w-[240px]"
+        style={{
+          background:     'var(--theme-glass-card)',
+          border:         '1px solid var(--theme-glass-border)',
+          backdropFilter: 'blur(12px)',
+        }}
       >
         {selected ? (
-          <span className="font-display text-sm font-bold text-ink truncate flex-1 text-left">
+          <span
+            className="font-display text-sm font-bold truncate flex-1 text-left"
+            style={{ color: 'var(--theme-text-primary)' }}
+          >
             {selected.symbol}
           </span>
         ) : (
-          <span className="text-sm font-medium text-subtle flex-1 text-left">Select symbol</span>
+          <span
+            className="text-sm font-medium flex-1 text-left"
+            style={{ color: 'var(--theme-text-ghost)' }}
+          >
+            Select symbol
+          </span>
         )}
-        <svg className="w-3.5 h-3.5 text-muted shrink-0 group-hover:text-ink transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg
+          className="w-3.5 h-3.5 shrink-0"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          style={{ color: 'var(--theme-text-muted)' }}
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
         </svg>
       </button>
 
-      {/* ── Glass panel ────────────────────────────────────────────────────── */}
+      {/* ── Modal panel ────────────────────────────────────────────────────── */}
       {open && (
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-sm"
+            className="fixed inset-0 z-40 backdrop-blur-sm"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
             onClick={() => setOpen(false)}
           />
 
           {/* Panel */}
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg animate-in">
-            <div className="bg-white/80 backdrop-blur-2xl border border-white/60 rounded-2xl shadow-[0_32px_80px_-8px_rgba(0,0,0,0.22),0_0_0_1px_rgba(255,255,255,0.5)] overflow-hidden">
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{
+                background:     'var(--theme-glass-topbar)',
+                border:         '1px solid var(--theme-glass-border-strong)',
+                backdropFilter: 'blur(28px) saturate(180%)',
+                boxShadow:      'var(--theme-glass-shadow)',
+              }}
+            >
 
-              {/* Header */}
-              <div className="px-5 pt-5 pb-4 border-b border-slate-100/80">
+              {/* ── Header ──────────────────────────────────────────────────── */}
+              <div
+                className="px-5 pt-5 pb-4"
+                style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="font-display text-base font-black text-ink tracking-tight">Select Instrument</p>
-                    <p className="text-xs text-muted mt-0.5">NSE · BSE · NFO · MCX</p>
+                    <p
+                      className="font-display text-base font-black tracking-tight"
+                      style={{ color: 'var(--theme-text-primary)' }}
+                    >
+                      Select Instrument
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
+                      NSE · BSE · NFO · MCX
+                    </p>
                   </div>
                   <button
                     onClick={() => setOpen(false)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-slate-100 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                    style={{ color: 'var(--theme-text-muted)' }}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -131,20 +161,20 @@ export function SymbolSelector({ selected, onSelect }: Props) {
                 {/* Exchange tabs */}
                 <div className="flex gap-1.5">
                   {EXCHANGES.map(ex => {
-                    const m = EXCHANGE_META[ex]
                     const active = exchange === ex
                     return (
                       <button
                         key={ex}
                         onClick={() => handleExchangeChange(ex)}
-                        className={`flex-1 flex flex-col items-center py-2 px-2 rounded-xl border text-center transition-all ${
-                          active
-                            ? `${m.bg} ${m.color} border-current/20 shadow-sm`
-                            : 'border-slate-100 bg-slate-50/60 text-subtle hover:bg-slate-100 hover:text-muted'
-                        }`}
+                        className="flex-1 flex flex-col items-center py-2 px-2 rounded-xl text-center transition-all"
+                        style={{
+                          background: active ? 'var(--theme-accent-soft)'   : 'var(--theme-glass-card)',
+                          border:     `1px solid ${active ? 'var(--theme-accent-border)' : 'var(--theme-glass-border)'}`,
+                          color:      active ? 'var(--theme-accent)'         : 'var(--theme-text-ghost)',
+                        }}
                       >
-                        <span className={`text-xs font-black tracking-wide ${active ? m.color : ''}`}>{ex}</span>
-                        <span className={`text-2xs mt-0.5 ${active ? m.color + '/70' : 'text-ghost'}`}>{m.desc}</span>
+                        <span className="text-xs font-black tracking-wide">{ex}</span>
+                        <span className="text-2xs mt-0.5" style={{ opacity: 0.7 }}>{EXCHANGE_DESC[ex]}</span>
                       </button>
                     )
                   })}
@@ -153,29 +183,50 @@ export function SymbolSelector({ selected, onSelect }: Props) {
                 {/* Sub-type filter */}
                 {showSubType && (
                   <div className="flex gap-1.5 mt-3">
-                    {(['FUT', 'CE', 'PE'] as SubType[]).map(t => (
-                      <button
-                        key={t}
-                        onClick={() => { setSubType(t); setResults([]); setTimeout(() => inputRef.current?.focus(), 50) }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          subType === t
-                            ? t === 'CE' ? 'bg-emerald-100 text-emerald-700 shadow-sm'
-                              : t === 'PE' ? 'bg-red-100 text-red-700 shadow-sm'
-                              : 'bg-brand-100 text-brand-700 shadow-sm'
-                            : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
-                        }`}
-                      >
-                        {t === 'FUT' ? 'Futures' : t === 'CE' ? 'Call (CE)' : 'Put (PE)'}
-                      </button>
-                    ))}
+                    {(['FUT', 'CE', 'PE'] as SubType[]).map(t => {
+                      const active = subType === t
+                      const activeColor =
+                        t === 'CE'  ? 'var(--theme-profit)' :
+                        t === 'PE'  ? 'var(--theme-loss)'   :
+                        'var(--theme-accent)'
+                      const activeBg =
+                        t === 'CE'  ? 'var(--theme-profit-bg)' :
+                        t === 'PE'  ? 'var(--theme-loss-bg)'   :
+                        'var(--theme-accent-soft)'
+                      const activeBorder =
+                        t === 'CE'  ? 'var(--theme-profit-border)' :
+                        t === 'PE'  ? 'var(--theme-loss-border)'   :
+                        'var(--theme-accent-border)'
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => { setSubType(t); setResults([]); setTimeout(() => inputRef.current?.focus(), 50) }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={{
+                            background: active ? activeBg             : 'var(--theme-glass-card)',
+                            border:     `1px solid ${active ? activeBorder : 'var(--theme-glass-border)'}`,
+                            color:      active ? activeColor          : 'var(--theme-text-ghost)',
+                          }}
+                        >
+                          {t === 'FUT' ? 'Futures' : t === 'CE' ? 'Call (CE)' : 'Put (PE)'}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
 
-              {/* Search input */}
-              <div className="px-5 py-3 border-b border-slate-100/80">
+              {/* ── Search input ─────────────────────────────────────────────── */}
+              <div
+                className="px-5 py-3"
+                style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
+              >
                 <div className="relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                   </svg>
                   <input
@@ -184,31 +235,41 @@ export function SymbolSelector({ selected, onSelect }: Props) {
                     onChange={e => handleSearch(e.target.value)}
                     placeholder={
                       exchange === 'NSE' ? 'Search e.g. RELIANCE, INFY…' :
-                      exchange === 'BSE' ? 'Search e.g. TCS, HDFC…' :
+                      exchange === 'BSE' ? 'Search e.g. TCS, HDFC…'      :
                       exchange === 'NFO' ? 'Search e.g. NIFTY, BANKNIFTY…' :
                       'Search e.g. GOLD, CRUDEOIL…'
                     }
-                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-ink placeholder-subtle focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-50 focus:bg-white transition-all"
+                    className="w-full rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none transition-all"
+                    style={{
+                      background:  'var(--theme-input-bg)',
+                      border:      '1px solid var(--theme-input-border)',
+                      color:       'var(--theme-input-text)',
+                    }}
                   />
                   {searching && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-300 border-t-transparent rounded-full animate-spin" />
+                    <div
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+                      style={{ borderColor: 'var(--theme-accent)', borderTopColor: 'transparent' }}
+                    />
                   )}
                 </div>
               </div>
 
-              {/* Results */}
+              {/* ── Results ──────────────────────────────────────────────────── */}
               <div className="max-h-64 overflow-y-auto">
                 {!searching && results.length === 0 && query.trim().length < 2 && (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
-                    <span className="text-3xl text-ghost">⌕</span>
-                    <p className="text-xs text-subtle">Type at least 2 characters to search</p>
+                    <span className="text-3xl" style={{ color: 'var(--theme-text-ghost)' }}>⌕</span>
+                    <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                      Type at least 2 characters to search
+                    </p>
                   </div>
                 )}
 
                 {!searching && query.trim().length >= 2 && results.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-10 gap-2">
-                    <span className="text-3xl text-ghost">○</span>
-                    <p className="text-xs text-subtle">No instruments found</p>
+                    <span className="text-3xl" style={{ color: 'var(--theme-text-ghost)' }}>○</span>
+                    <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>No instruments found</p>
                   </div>
                 )}
 
@@ -216,34 +277,48 @@ export function SymbolSelector({ selected, onSelect }: Props) {
                   <button
                     key={r.token}
                     onClick={() => handleSelect(r)}
-                    className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-brand-50/60 transition-colors text-left ${
-                      i !== results.length - 1 ? 'border-b border-slate-100/80' : ''
-                    }`}
+                    className="w-full flex items-center gap-3 px-5 py-3 transition-colors text-left"
+                    style={{
+                      borderBottom: i !== results.length - 1
+                        ? '1px solid var(--theme-glass-border)'
+                        : 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--theme-accent-soft)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-display text-sm font-bold text-ink truncate">{r.symbol}</span>
+                        <span
+                          className="font-display text-sm font-bold truncate"
+                          style={{ color: 'var(--theme-text-primary)' }}
+                        >
+                          {r.symbol}
+                        </span>
                         <TypeBadge type={r.type} />
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {r.name && <span className="text-2xs text-subtle truncate">{r.name}</span>}
+                        {r.name && (
+                          <span className="text-2xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                            {r.name}
+                          </span>
+                        )}
                         {r.expiry && (
                           <>
-                            {r.name && <span className="text-2xs text-ghost">·</span>}
-                            <span className="text-2xs text-subtle">{r.expiry}</span>
+                            {r.name && <span className="text-2xs" style={{ color: 'var(--theme-text-ghost)' }}>·</span>}
+                            <span className="text-2xs" style={{ color: 'var(--theme-text-muted)' }}>{r.expiry}</span>
                           </>
                         )}
                         {r.strike && (
                           <>
-                            <span className="text-2xs text-ghost">·</span>
-                            <span className="text-2xs text-subtle">@ ₹{r.strike}</span>
+                            <span className="text-2xs" style={{ color: 'var(--theme-text-ghost)' }}>·</span>
+                            <span className="text-2xs" style={{ color: 'var(--theme-text-muted)' }}>@ ₹{r.strike}</span>
                           </>
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="text-2xs font-bold text-muted">{r.lot_size} lot</span>
-                    </div>
+                    <span className="text-2xs font-bold shrink-0" style={{ color: 'var(--theme-text-muted)' }}>
+                      {r.lot_size} lot
+                    </span>
                   </button>
                 ))}
               </div>
@@ -259,12 +334,30 @@ export function SymbolSelector({ selected, onSelect }: Props) {
 // ── Type badge ────────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: string }) {
+  const color =
+    type === 'CE'  ? 'var(--theme-profit)'       :
+    type === 'PE'  ? 'var(--theme-loss)'          :
+    type === 'FUT' ? 'var(--theme-accent)'        :
+    'var(--theme-text-muted)'
+
+  const bg =
+    type === 'CE'  ? 'var(--theme-profit-bg)'    :
+    type === 'PE'  ? 'var(--theme-loss-bg)'       :
+    type === 'FUT' ? 'var(--theme-accent-soft)'  :
+    'var(--theme-glass-card)'
+
+  const border =
+    type === 'CE'  ? 'var(--theme-profit-border)' :
+    type === 'PE'  ? 'var(--theme-loss-border)'    :
+    type === 'FUT' ? 'var(--theme-accent-border)'  :
+    'var(--theme-glass-border)'
+
   return (
-    <span className={`text-2xs font-bold px-1.5 py-0.5 rounded shrink-0 ${
-      type === 'CE'  ? 'bg-emerald-100 text-emerald-700' :
-      type === 'PE'  ? 'bg-red-100     text-red-700'     :
-      type === 'FUT' ? 'bg-brand-100   text-brand-700'   :
-                       'bg-slate-100   text-slate-600'
-    }`}>{type}</span>
+    <span
+      className="text-2xs font-bold px-1.5 py-0.5 rounded shrink-0"
+      style={{ color, background: bg, border: `1px solid ${border}` }}
+    >
+      {type}
+    </span>
   )
 }

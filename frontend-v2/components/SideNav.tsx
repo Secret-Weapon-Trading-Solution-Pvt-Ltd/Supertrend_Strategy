@@ -49,9 +49,10 @@ const NAV = [
 
 // Active colour per route
 const ACCENT: Record<string, string> = {
-  '/dashboard':           'text-brand-600   bg-brand-50',
-  '/dashboard/trades':    'text-trades-600  bg-trades-50',
+  '/dashboard':           'text-brand-600     bg-brand-50',
+  '/dashboard/trades':    'text-trades-600    bg-trades-50',
   '/dashboard/portfolio': 'text-portfolio-600 bg-portfolio-50',
+  '/dashboard/logs':      'text-settings-600  bg-settings-50',
   '/dashboard/settings':  'text-settings-600  bg-settings-50',
 }
 

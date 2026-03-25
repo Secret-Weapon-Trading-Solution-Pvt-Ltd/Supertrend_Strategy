@@ -21,28 +21,46 @@ export default function TradesPage() {
   const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-raised">
+    <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
-      <div className="shrink-0 bg-surface border-b border-edge px-8 py-6">
+      <div
+        className="shrink-0 px-8 py-6"
+        style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
+      >
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs font-bold text-trades-600 uppercase tracking-widest mb-1">History</p>
-            <h1 className="font-display text-3xl font-bold text-ink">Trade Log</h1>
+            <p className="text-xs font-bold uppercase tracking-widest mb-1"
+              style={{ color: 'var(--theme-accent)' }}>
+              History
+            </p>
+            <h1 className="font-display text-3xl font-bold"
+              style={{ color: 'var(--theme-text-primary)' }}>
+              Trade Log
+            </h1>
           </div>
-          <p className="text-sm text-muted">{trades.length} completed trade{trades.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+            {trades.length} completed trade{trades.length !== 1 ? 's' : ''}
+          </p>
         </div>
       </div>
 
       {/* ── Stat strip ────────────────────────────────────────────────────── */}
-      <div className="shrink-0 grid grid-cols-4 border-b border-edge">
-        <StatCard label="Total Trades" value={String(trades.length)} accent="text-ink" />
-        <StatCard label="Win Rate"     value={`${winRate}%`}          accent="text-trades-600" border />
-        <StatCard label="Wins / Losses" value={`${wins} / ${losses}`} accent="text-ink" border />
+      <div
+        className="shrink-0 grid grid-cols-4"
+        style={{ borderBottom: '1px solid var(--theme-glass-border)' }}
+      >
+        <StatCard label="Total Trades"  value={String(trades.length)}
+          valueColor="var(--theme-text-primary)" />
+        <StatCard label="Win Rate"      value={`${winRate}%`}
+          valueColor="var(--theme-accent)"  border />
+        <StatCard label="Wins / Losses" value={`${wins} / ${losses}`}
+          valueColor="var(--theme-text-primary)" border />
         <StatCard
           label="Net P&L"
           value={`${netPnl >= 0 ? '+' : ''}₹${netPnl.toFixed(2)}`}
-          accent={netPnl >= 0 ? 'text-profit' : 'text-loss'}
+          valueColor={netPnl >= 0 ? 'var(--theme-profit)' : 'var(--theme-loss)'}
+          glow={netPnl >= 0 ? 'var(--theme-profit-glow)' : 'var(--theme-loss-glow)'}
           border
         />
       </div>
@@ -54,49 +72,102 @@ export default function TradesPage() {
         ) : trades.length === 0 ? (
           <Empty />
         ) : (
-          <div className="bg-surface rounded-2xl border border-edge overflow-hidden">
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background:     'var(--theme-glass-card)',
+              border:         '1px solid var(--theme-glass-border)',
+              backdropFilter: 'blur(20px) saturate(160%)',
+            }}
+          >
             <table className="w-full">
               <thead>
-                <tr className="border-b border-edge bg-sunken">
+                <tr style={{ borderBottom: '1px solid var(--theme-glass-border)', background: 'var(--theme-glass-panel)' }}>
                   {['Symbol', 'Mode', 'Interval', 'Qty', 'Entry', 'Exit', 'Points', 'P&L', 'Result', 'Reason', 'Time'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-2xs font-bold text-subtle uppercase tracking-widest whitespace-nowrap">
+                    <th
+                      key={h}
+                      className="text-left px-4 py-3 text-2xs font-bold uppercase tracking-widest whitespace-nowrap"
+                      style={{ color: 'var(--theme-text-ghost)' }}
+                    >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {trades.map(t => (
-                  <tr key={t.id} className="border-b border-edge last:border-0 hover:bg-sunken transition-colors">
-                    <td className="px-4 py-3 text-sm font-semibold text-ink">{t.symbol}</td>
+                {trades.map((t, i) => (
+                  <tr
+                    key={t.id}
+                    style={{ borderBottom: i < trades.length - 1 ? '1px solid var(--theme-glass-border)' : 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--theme-accent-soft)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td className="px-4 py-3 text-sm font-semibold"
+                      style={{ color: 'var(--theme-text-primary)' }}>
+                      {t.symbol}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                        t.broker_mode === 'live'
-                          ? 'bg-loss-bg text-loss'
-                          : 'bg-trades-50 text-trades-600'
-                      }`}>
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-md"
+                        style={t.broker_mode === 'live' ? {
+                          color:      'var(--theme-loss)',
+                          background: 'var(--theme-loss-bg)',
+                          border:     '1px solid var(--theme-loss-border)',
+                        } : {
+                          color:      'var(--theme-accent)',
+                          background: 'var(--theme-accent-soft)',
+                          border:     '1px solid var(--theme-accent-border)',
+                        }}
+                      >
                         {t.broker_mode === 'live' ? 'Live' : 'Sim'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted font-mono">{t.interval}</td>
-                    <td className="px-4 py-3 text-sm text-muted tabular-nums">{t.qty}</td>
-                    <td className="px-4 py-3 text-sm text-ink tabular-nums font-mono">₹{t.entry_price.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-sm text-ink tabular-nums font-mono">₹{t.exit_price.toFixed(2)}</td>
-                    <td className={`px-4 py-3 text-sm tabular-nums font-semibold font-mono ${t.pnl_points >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    <td className="px-4 py-3 text-sm font-mono"
+                      style={{ color: 'var(--theme-text-muted)' }}>
+                      {t.interval}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums"
+                      style={{ color: 'var(--theme-text-muted)' }}>
+                      {t.qty}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums font-mono"
+                      style={{ color: 'var(--theme-text-primary)' }}>
+                      ₹{t.entry_price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums font-mono"
+                      style={{ color: 'var(--theme-text-primary)' }}>
+                      ₹{t.exit_price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums font-semibold font-mono"
+                      style={{ color: t.pnl_points >= 0 ? 'var(--theme-profit)' : 'var(--theme-loss)' }}>
                       {t.pnl_points >= 0 ? '+' : ''}{t.pnl_points.toFixed(1)}
                     </td>
-                    <td className={`px-4 py-3 text-sm tabular-nums font-bold font-mono ${t.pnl_amount >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    <td className="px-4 py-3 text-sm tabular-nums font-bold font-mono"
+                      style={{ color: t.pnl_amount >= 0 ? 'var(--theme-profit)' : 'var(--theme-loss)' }}>
                       {t.pnl_amount >= 0 ? '+' : ''}₹{t.pnl_amount.toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                        t.result === 'PROFIT' ? 'bg-profit-bg text-profit' : 'bg-loss-bg text-loss'
-                      }`}>
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-md"
+                        style={t.result === 'PROFIT' ? {
+                          color:      'var(--theme-profit)',
+                          background: 'var(--theme-profit-bg)',
+                          border:     '1px solid var(--theme-profit-border)',
+                        } : {
+                          color:      'var(--theme-loss)',
+                          background: 'var(--theme-loss-bg)',
+                          border:     '1px solid var(--theme-loss-border)',
+                        }}
+                      >
                         {t.result}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted">{t.exit_reason}</td>
-                    <td className="px-4 py-3 text-xs text-subtle tabular-nums font-mono">
+                    <td className="px-4 py-3 text-xs"
+                      style={{ color: 'var(--theme-text-muted)' }}>
+                      {t.exit_reason}
+                    </td>
+                    <td className="px-4 py-3 text-xs tabular-nums font-mono"
+                      style={{ color: 'var(--theme-text-ghost)' }}>
                       {t.exit_time?.slice(0, 19).replace('T', ' ') ?? '—'}
                     </td>
                   </tr>
@@ -110,33 +181,68 @@ export default function TradesPage() {
   )
 }
 
-function StatCard({ label, value, accent, border }: {
-  label: string; value: string; accent: string; border?: boolean
+// ── StatCard ──────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, valueColor, glow, border }: {
+  label:      string
+  value:      string
+  valueColor: string
+  glow?:      string
+  border?:    boolean
 }) {
   return (
-    <div className={`bg-surface px-8 py-5 ${border ? 'border-l border-edge' : ''}`}>
-      <p className="text-xs text-muted uppercase tracking-widest mb-2">{label}</p>
-      <p className={`font-display text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
+    <div
+      className="px-8 py-5"
+      style={{ borderLeft: border ? '1px solid var(--theme-glass-border)' : 'none' }}
+    >
+      <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--theme-text-muted)' }}>
+        {label}
+      </p>
+      <p
+        className="font-display text-2xl font-bold tabular-nums"
+        style={{ color: valueColor, textShadow: glow ?? 'none' }}
+      >
+        {value}
+      </p>
     </div>
   )
 }
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
 function Skeleton() {
   return (
-    <div className="bg-surface rounded-2xl border border-edge p-6 space-y-3">
+    <div
+      className="rounded-2xl p-6 space-y-3"
+      style={{
+        background:     'var(--theme-glass-card)',
+        border:         '1px solid var(--theme-glass-border)',
+        backdropFilter: 'blur(20px)',
+      }}
+    >
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-9 bg-sunken rounded-lg animate-pulse" />
+        <div
+          key={i}
+          className="h-9 rounded-lg animate-pulse"
+          style={{ background: 'var(--theme-glass-panel)' }}
+        />
       ))}
     </div>
   )
 }
 
+// ── Empty ─────────────────────────────────────────────────────────────────────
+
 function Empty() {
   return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
-      <span className="text-5xl text-ghost">◎</span>
-      <p className="text-base font-semibold text-muted">No trades yet</p>
-      <p className="text-sm text-subtle">Start the engine on the Trading page to begin</p>
+      <span className="text-5xl" style={{ color: 'var(--theme-text-ghost)' }}>◎</span>
+      <p className="text-base font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+        No trades yet
+      </p>
+      <p className="text-sm" style={{ color: 'var(--theme-text-ghost)' }}>
+        Start the engine on the Trading page to begin
+      </p>
     </div>
   )
 }

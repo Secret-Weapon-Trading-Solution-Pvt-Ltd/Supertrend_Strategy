@@ -28,6 +28,7 @@ export default function HomePage() {
             client_id:     'swts-frontend',
             redirect_uri:  APP_URL,
             response_type: 'code',
+            scope:         'openid',
           })
           window.location.href = `${KEYCLOAK_URL}/realms/SWTS/protocol/openid-connect/auth?${kp}`
         }

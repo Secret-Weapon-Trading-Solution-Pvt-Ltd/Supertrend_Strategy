@@ -2,15 +2,13 @@
    TrendEdge — Keycloak Login Theme
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ── Page ───────────────────────────────────────────────────────*/
 body,
 .login-pf,
 .login-pf-page {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
   background: #f0f4ff !important;
   color: #1e293b !important;
   min-height: 100vh !important;

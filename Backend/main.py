@@ -138,6 +138,28 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     log.info("Scheduler: Daily auto-login scheduled at 08:30 AM IST")
 
+    # Refresh encrypted credentials for any TOTP account matching KITE_USER_ID.
+    # Ensures DB is always in sync with .env (fixes stale/wrong encrypted values).
+    try:
+        from config.crypto import encrypt as _encrypt
+        async with async_session() as db:
+            result = await db.execute(
+                select(Account).where(
+                    Account.user_id     == zeroda.USER_ID,
+                    Account.auth_method == "totp",
+                )
+            )
+            primary = result.scalars().first()
+            if primary:
+                primary.api_key              = zeroda.API_KEY
+                primary.api_secret_encrypted = _encrypt(zeroda.API_SECRET)
+                primary.password_encrypted   = _encrypt(zeroda.PASSWORD)
+                primary.totp_key_encrypted   = _encrypt(zeroda.TOTP_KEY)
+                await db.commit()
+                log.info("Startup: Refreshed credentials for account '%s' from .env", primary.label)
+    except Exception as exc:
+        log.warning("Startup: Could not refresh account credentials: %s", exc)
+
     try:
         async with async_session() as db:
             result = await db.execute(
@@ -263,6 +285,7 @@ async def index(request: Request, request_token: str | None = None, status: str 
                 "access_token": _access_token,
             })
         except Exception as exc:
+            log.error("OAuth token exchange failed: %s", exc)
             return templates.TemplateResponse(request, "index.html", {
                 "logged_in": False,
                 "error":     str(exc),

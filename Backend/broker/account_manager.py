@@ -52,24 +52,40 @@ async def login_account(db: AsyncSession, account_id: str) -> str:
     if not row:
         raise ValueError(f"Account {account_id} not found in DB")
 
-    # Decrypt stored credentials and patch env so auto_login() picks them up
     import os
-    os.environ["KITE_API_KEY"]    = row.api_key
-    os.environ["KITE_API_SECRET"] = decrypt(row.api_secret_encrypted)
-    os.environ["KITE_USER_ID"]    = row.user_id
-    os.environ["KITE_PASSWORD"]   = decrypt(row.password_encrypted)
-    os.environ["KITE_TOTP_KEY"]   = decrypt(row.totp_key_encrypted)
+    import zeroda as _zeroda
 
-    # Reload zeroda module globals with fresh credentials
-    import zeroda
-    zeroda.API_KEY    = row.api_key
-    zeroda.API_SECRET = decrypt(row.api_secret_encrypted)
-    zeroda.USER_ID    = row.user_id
-    zeroda.PASSWORD   = decrypt(row.password_encrypted)
-    zeroda.TOTP_KEY   = decrypt(row.totp_key_encrypted)
+    # Save original module globals so we can restore them if login fails
+    _orig = {
+        "API_KEY":    _zeroda.API_KEY,
+        "API_SECRET": _zeroda.API_SECRET,
+        "USER_ID":    _zeroda.USER_ID,
+        "PASSWORD":   _zeroda.PASSWORD,
+        "TOTP_KEY":   _zeroda.TOTP_KEY,
+        "kite_api":   _zeroda.kite.api_key,
+    }
 
-    # Run TOTP login — sets kite access token + returns access_token
-    access_token = totp_auto_login()
+    # Decrypt stored credentials and patch zeroda module + kite object
+    decrypted_secret = decrypt(row.api_secret_encrypted)
+    _zeroda.API_KEY    = row.api_key
+    _zeroda.API_SECRET = decrypted_secret
+    _zeroda.USER_ID    = row.user_id
+    _zeroda.PASSWORD   = decrypt(row.password_encrypted)
+    _zeroda.TOTP_KEY   = decrypt(row.totp_key_encrypted)
+    _zeroda.kite.api_key = row.api_key  # keep kite object consistent for checksum
+
+    try:
+        # Run TOTP login — sets kite access token + returns access_token
+        access_token = totp_auto_login()
+    except Exception:
+        # Restore original credentials so subsequent OAuth exchange is not contaminated
+        _zeroda.API_KEY    = _orig["API_KEY"]
+        _zeroda.API_SECRET = _orig["API_SECRET"]
+        _zeroda.USER_ID    = _orig["USER_ID"]
+        _zeroda.PASSWORD   = _orig["PASSWORD"]
+        _zeroda.TOTP_KEY   = _orig["TOTP_KEY"]
+        _zeroda.kite.api_key = _orig["kite_api"]
+        raise
 
     # Persist access_token to DB
     await db.execute(

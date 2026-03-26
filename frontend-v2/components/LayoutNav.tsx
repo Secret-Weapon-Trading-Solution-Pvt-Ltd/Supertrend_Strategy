@@ -1,19 +1,9 @@
 'use client'
 
-import { useMemo }     from 'react'
 import Link            from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth }     from '@/store/AuthStore'
 import { logoutUser }  from '@/lib/api'
-
-function hasAdminRole(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return (payload?.realm_access?.roles ?? []).includes('admin')
-  } catch {
-    return false
-  }
-}
 
 const NAV = [
   {
@@ -81,7 +71,6 @@ export function LayoutNav() {
   const pathname          = usePathname()
   const router            = useRouter()
   const { state: auth, logout } = useAuth()
-  const isAdmin = useMemo(() => hasAdminRole(auth.accessToken), [auth.accessToken])
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -194,40 +183,6 @@ export function LayoutNav() {
           )
         })}
       </div>
-
-      {/* Admin link — only for admin role users */}
-      {isAdmin && (() => {
-        const href   = '/dashboard/admin'
-        const active = pathname.startsWith(href)
-        return (
-          <Link
-            href={href}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150"
-            style={{
-              background: active ? 'var(--theme-accent-soft)'   : 'transparent',
-              border:     `1px solid ${active ? 'var(--theme-accent-border)' : 'transparent'}`,
-            }}
-          >
-            <span style={{ color: active ? 'var(--theme-accent)' : 'var(--theme-text-muted)' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5 shrink-0">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-tight" style={{ color: active ? 'var(--theme-accent)' : 'var(--theme-text-primary)' }}>
-                Admin
-              </p>
-              <p className="text-2xs mt-0.5 truncate" style={{ color: 'var(--theme-text-muted)' }}>
-                User management
-              </p>
-            </div>
-            {active && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--theme-accent)' }} />}
-          </Link>
-        )
-      })()}
 
       {/* User block */}
       <div

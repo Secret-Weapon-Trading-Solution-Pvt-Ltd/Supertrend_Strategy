@@ -3,6 +3,7 @@
 import Link            from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth }     from '@/store/AuthStore'
+import { logoutUser }  from '@/lib/api'
 
 const NAV = [
   {
@@ -78,10 +79,18 @@ export function LayoutNav() {
 
   async function handleLogout() {
     try {
-      await fetch('/logout')   // tells backend to invalidate token + clear DB session
+      await logoutUser()   // invalidate Zerodha token + clear DB session
     } catch { /* ignore */ }
-    logout()                   // clear local React state
-    router.replace('/')        // redirect to login page
+    logout()               // clear local React state
+
+    // Redirect to Keycloak login page
+    const keycloakUrl = 'http://localhost:8080/realms/SWTS/protocol/openid-connect/auth'
+    const params = new URLSearchParams({
+      client_id:     'swts-frontend',
+      redirect_uri:  'http://localhost:3000',
+      response_type: 'code',
+    })
+    window.location.href = `${keycloakUrl}?${params}`
   }
 
   const initials = auth.userName

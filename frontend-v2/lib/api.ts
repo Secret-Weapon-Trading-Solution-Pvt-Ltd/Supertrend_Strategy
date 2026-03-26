@@ -70,6 +70,14 @@ export async function getStatus(): Promise<StatusResponse> {
   return res.data
 }
 
+/**
+ * Logout — invalidates Zerodha token and clears DB session.
+ * Uses axios directly (bypasses Next.js proxy rewrite).
+ */
+export async function logoutUser(): Promise<void> {
+  await api.get('/logout')
+}
+
 // ── Market Reference Data ─────────────────────────────────────────────────────
 
 /**

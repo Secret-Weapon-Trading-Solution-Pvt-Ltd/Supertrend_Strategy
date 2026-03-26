@@ -78,19 +78,19 @@ export function LayoutNav() {
   }
 
   async function handleLogout() {
-    try {
-      await logoutUser()   // invalidate Zerodha token + clear DB session
-    } catch { /* ignore */ }
-    logout()               // clear local React state
+    const KEYCLOAK_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL || 'http://localhost:8080'
+    const APP_URL      = process.env.NEXT_PUBLIC_APP_URL      || 'http://localhost:3000'
 
-    // Redirect to Keycloak logout endpoint — clears Keycloak session,
-    // then Keycloak redirects to the login page
-    const logoutUrl = 'http://localhost:8080/realms/SWTS/protocol/openid-connect/logout'
+    try {
+      await logoutUser()
+    } catch { /* ignore */ }
+    logout()
+
     const params = new URLSearchParams({
-      client_id:              'swts-frontend',
-      post_logout_redirect_uri: 'http://localhost:3000',
+      client_id:               'swts-frontend',
+      post_logout_redirect_uri: APP_URL,
     })
-    window.location.href = `${logoutUrl}?${params}`
+    window.location.href = `${KEYCLOAK_URL}/realms/SWTS/protocol/openid-connect/logout?${params}`
   }
 
   const initials = auth.userName

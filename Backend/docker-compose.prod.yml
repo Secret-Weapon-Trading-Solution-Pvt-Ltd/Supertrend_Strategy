@@ -1,0 +1,89 @@
+services:
+
+  swts_postgres:
+    image: postgres:16-alpine
+    container_name: swts_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       postgres
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SwtsSecure2026Pg}
+    volumes:
+      - swts_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - swts_internal
+
+  swts_keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: swts_keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN:          admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_DB:                   postgres
+      KC_DB_URL:               jdbc:postgresql://swts_postgres:5432/postgres
+      KC_DB_USERNAME:          postgres
+      KC_DB_PASSWORD:          ${POSTGRES_PASSWORD:-SwtsSecure2026Pg}
+      KC_HTTP_PORT:            8080
+      KC_HTTP_RELATIVE_PATH:   /auth
+      KC_PROXY_HEADERS:        xforwarded
+      KC_HOSTNAME_STRICT:      "false"
+      KC_HTTP_ENABLED:         "true"
+    volumes:
+      - ../keycloak-theme/swts:/opt/keycloak/themes/swts
+    depends_on:
+      swts_postgres:
+        condition: service_healthy
+    networks:
+      - swts_internal
+      - shared_proxy_network
+
+  swts_backend:
+    build: .
+    container_name: swts_backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      swts_postgres:
+        condition: service_healthy
+      swts_keycloak:
+        condition: service_started
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    networks:
+      - swts_internal
+      - shared_proxy_network
+
+  swts_frontend:
+    build:
+      context: ../frontend-v2
+      args:
+        NEXT_PUBLIC_KEYCLOAK_URL: ${KEYCLOAK_URL:-https://trendedge.secretweapon.in/auth}
+        NEXT_PUBLIC_APP_URL:      ${APP_URL:-https://trendedge.secretweapon.in}
+        NEXT_PUBLIC_BACKEND_URL:  ""
+    container_name: swts_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV:       production
+      BACKEND_ORIGIN: http://swts_backend:8000
+    depends_on:
+      - swts_backend
+    networks:
+      - swts_internal
+      - shared_proxy_network
+
+volumes:
+  swts_postgres_data:
+
+networks:
+  swts_internal:
+    driver: bridge
+  shared_proxy_network:
+    external: true

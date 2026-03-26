@@ -8,9 +8,13 @@ RUN npm ci
 COPY . .
 
 # NEXT_PUBLIC_* vars are baked into the client bundle at build time.
-# Value must be the URL the browser uses to reach the backend.
 ARG NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+ARG NEXT_PUBLIC_KEYCLOAK_URL=http://localhost:8080
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+
 ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+ENV NEXT_PUBLIC_KEYCLOAK_URL=$NEXT_PUBLIC_KEYCLOAK_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
 RUN mkdir -p public && npm run build
 

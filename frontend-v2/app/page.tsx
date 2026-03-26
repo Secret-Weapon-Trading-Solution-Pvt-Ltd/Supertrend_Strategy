@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getStatus } from '@/lib/api'
+import { getStatus, authLogin } from '@/lib/api'
 
 export default function HomePage() {
   const router = useRouter()
@@ -14,12 +14,27 @@ export default function HomePage() {
   const [error, setError]       = useState('')
 
   useEffect(() => {
-    getStatus()
+    const params = new URLSearchParams(window.location.search)
+    const hasCode = params.has('code')
+
+    // If Keycloak just redirected back with ?code=, trigger TOTP login first
+    const loginFn = hasCode ? authLogin : getStatus
+
+    loginFn()
       .then(status => {
         if (status.logged_in) {
+          // Clean the ?code= from URL before navigating
+          window.history.replaceState({}, '', '/')
           router.replace('/dashboard')
         } else {
-          setChecking(false)
+          // Not logged in — redirect to Keycloak login
+          const keycloakUrl = 'http://localhost:8080/realms/SWTS/protocol/openid-connect/auth'
+          const kp = new URLSearchParams({
+            client_id:     'swts-frontend',
+            redirect_uri:  'http://localhost:3000',
+            response_type: 'code',
+          })
+          window.location.href = `${keycloakUrl}?${kp}`
         }
       })
       .catch(err => {

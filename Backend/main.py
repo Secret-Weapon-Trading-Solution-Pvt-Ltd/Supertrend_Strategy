@@ -327,6 +327,66 @@ async def logout():
     return {"logged_out": True}
 
 
+# ── Auth login (triggered after Keycloak redirect) ────────────────────────────
+
+@fastapi_app.post("/auth/login")
+async def auth_login():
+    """
+    Called by the frontend after Keycloak redirects back with ?code=.
+    Runs TOTP auto-login to get a fresh Zerodha access token,
+    then returns the same shape as /status.
+    """
+    global _access_token
+    try:
+        async with async_session() as db:
+            # Check if already connected with a valid token
+            result = await db.execute(
+                select(Account).where(
+                    Account.is_active    == True,
+                    Account.is_connected == True,
+                    Account.access_token != None,
+                )
+            )
+            account = result.scalars().first()
+            if account:
+                valid, info = zeroda.verify_token(account.access_token)
+                if valid:
+                    return {
+                        "logged_in": True,
+                        "user":    info["user_name"],
+                        "user_id": info["user_id"],
+                        "ticker":  zeroda.ticker_status(),
+                    }
+
+            # Not connected — run TOTP auto-login
+            sessions = await load_and_autologin_all(db)
+            if not sessions:
+                return JSONResponse(
+                    {"logged_in": False, "reason": "TOTP auto-login failed"},
+                    status_code=401,
+                )
+            _access_token = next(iter(sessions.values()))
+
+        try:
+            zeroda.init_ticker(_access_token)
+        except Exception as exc:
+            log.warning("auth/login: ticker init failed: %s", exc)
+
+        valid, info = zeroda.verify_token(_access_token)
+        if valid:
+            return {
+                "logged_in": True,
+                "user":    info["user_name"],
+                "user_id": info["user_id"],
+                "ticker":  zeroda.ticker_status(),
+            }
+        return JSONResponse({"logged_in": False, "reason": info}, status_code=401)
+
+    except Exception as exc:
+        log.error("auth/login error: %s", exc)
+        return JSONResponse({"logged_in": False, "reason": str(exc)}, status_code=500)
+
+
 # ── Status & Ticker REST ──────────────────────────────────────────────────────
 
 @fastapi_app.get("/status")

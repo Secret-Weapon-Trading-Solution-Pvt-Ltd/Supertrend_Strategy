@@ -83,14 +83,14 @@ export function LayoutNav() {
     } catch { /* ignore */ }
     logout()               // clear local React state
 
-    // Redirect to Keycloak login page
-    const keycloakUrl = 'http://localhost:8080/realms/SWTS/protocol/openid-connect/auth'
+    // Redirect to Keycloak logout endpoint — clears Keycloak session,
+    // then Keycloak redirects to the login page
+    const logoutUrl = 'http://localhost:8080/realms/SWTS/protocol/openid-connect/logout'
     const params = new URLSearchParams({
-      client_id:     'swts-frontend',
-      redirect_uri:  'http://localhost:3000',
-      response_type: 'code',
+      client_id:              'swts-frontend',
+      post_logout_redirect_uri: 'http://localhost:3000',
     })
-    window.location.href = `${keycloakUrl}?${params}`
+    window.location.href = `${logoutUrl}?${params}`
   }
 
   const initials = auth.userName

@@ -367,6 +367,33 @@ class TradingEngine:
 
             if signal == "BUY" and self.state == EngineState.RUNNING:
                 log.info("[ENGINE] BUY signal — %s qty=%d @ %.2f", self.symbol, self.qty, close)
+
+                # ── Funds check before placing order ──────────────────────
+                required = self.broker.get_order_margin(
+                    symbol=self.symbol, qty=self.qty,
+                    transaction_type="BUY", product="MIS",
+                    exchange=self.exchange,
+                )
+                funds    = self.broker.get_funds()
+                available = funds.get("live_balance", 0.0)
+
+                log.info(
+                    "[ENGINE] Margin check — required=₹%.2f available=₹%.2f",
+                    required, available,
+                )
+
+                if required > 0 and available < required:
+                    log.warning(
+                        "[ENGINE] BUY BLOCKED — insufficient funds | required=₹%.2f available=₹%.2f",
+                        required, available,
+                    )
+                    emit_sync("funds:insufficient", {
+                        "symbol":    self.symbol,
+                        "required":  required,
+                        "available": available,
+                    })
+                    return
+
                 emit_sync("signal:buy", {"symbol": self.symbol, "price": close, "time": ts})
                 order_id = self.broker.place_order(
                     symbol=self.symbol, token=self.instrument_token,

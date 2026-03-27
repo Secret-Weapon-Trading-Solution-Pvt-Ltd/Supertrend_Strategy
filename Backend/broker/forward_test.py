@@ -226,6 +226,23 @@ class ForwardTestBroker(BrokerABC):
             return self._real.get_latest_ticks()
         return {}
 
+    def get_funds(self) -> dict:
+        """Returns virtual capital as funds summary."""
+        return {
+            "live_balance": round(self.available_capital, 2),
+            "collateral":   0.0,
+            "net":          round(self.available_capital, 2),
+        }
+
+    def get_order_margin(self, symbol: str, qty: int, transaction_type: str,
+                         product: str, exchange: str = "NSE") -> float:
+        """
+        In forward test, required margin = fill_price * qty.
+        Uses live LTP to estimate cost.
+        """
+        ltp = self._get_ltp(self.position["token"] if self.position else 0)
+        return round(ltp * qty, 2) if ltp else 0.0
+
     # ── Summary ───────────────────────────────────────────────────────────────
 
     def summary(self) -> dict:

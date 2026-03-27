@@ -110,6 +110,46 @@ class ZerodhaBroker(BrokerABC):
     def get_instruments(self, exchange: str = "NSE") -> list[dict]:
         return self.kite.instruments(exchange=exchange)
 
+    def get_funds(self) -> dict:
+        """
+        Returns available equity funds from Zerodha.
+        {live_balance, collateral, net}
+        """
+        try:
+            data = self.kite.margins(segment="equity")
+            avail = data.get("equity", data).get("available", {})
+            return {
+                "live_balance": round(avail.get("live_balance", 0.0), 2),
+                "collateral":   round(avail.get("collateral", 0.0), 2),
+                "net":          round(data.get("equity", data).get("net", 0.0), 2),
+            }
+        except Exception as e:
+            log.error("get_funds error: %s", e)
+            return {"live_balance": 0.0, "collateral": 0.0, "net": 0.0}
+
+    def get_order_margin(self, symbol: str, qty: int, transaction_type: str,
+                         product: str, exchange: str = "NSE") -> float:
+        """
+        Returns exact margin required (₹) for a specific order
+        using Kite order_margins API.
+        """
+        try:
+            result = self.kite.order_margins([{
+                "exchange":         exchange,
+                "tradingsymbol":    symbol,
+                "transaction_type": transaction_type,
+                "variety":          "regular",
+                "product":          product,
+                "order_type":       "MARKET",
+                "quantity":         qty,
+            }])
+            if result:
+                return round(float(result[0].get("total", 0.0)), 2)
+            return 0.0
+        except Exception as e:
+            log.error("get_order_margin error: %s", e)
+            return 0.0
+
     # ── Orders ────────────────────────────────────────────────────────────────
 
     def place_order(self, symbol: str, token: int, qty: int,

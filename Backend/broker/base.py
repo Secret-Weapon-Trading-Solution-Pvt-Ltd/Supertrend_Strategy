@@ -44,3 +44,12 @@ class BrokerABC(ABC):
 
     @abstractmethod
     def get_latest_ticks(self) -> dict: ...
+
+    @abstractmethod
+    def get_funds(self) -> dict: ...
+    """Returns available funds: {live_balance, collateral, net}"""
+
+    @abstractmethod
+    def get_order_margin(self, symbol: str, qty: int, transaction_type: str,
+                         product: str, exchange: str) -> float: ...
+    """Returns exact margin required (₹) for a specific order."""

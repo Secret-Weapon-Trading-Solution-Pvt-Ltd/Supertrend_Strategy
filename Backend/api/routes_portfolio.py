@@ -1,6 +1,10 @@
 """
 api/routes_portfolio.py — Portfolio REST endpoints.
 
+GET /api/funds      — fetch available funds / margin
+                      live         → real equity margin from Zerodha (live_balance, collateral, net)
+                      forward_test → virtual capital from ForwardTestBroker
+
 GET /api/holdings   — fetch holdings based on current broker mode
                       live         → real DEMAT holdings from Zerodha
                       forward_test → virtual capital summary from ForwardTestBroker
@@ -24,6 +28,37 @@ def _get_engine():
     """Import _engine from main at call time to avoid circular import."""
     from main import _engine
     return _engine
+
+
+# ── Funds ─────────────────────────────────────────────────────────────────────
+
+@router.get("/funds")
+async def get_funds():
+    """
+    Live mode    → real equity margin from Zerodha (live_balance, collateral, net).
+    Forward test → virtual capital from ForwardTestBroker.
+    """
+    try:
+        if settings.broker_mode == "live":
+            data  = zeroda.kite.margins(segment="equity")
+            avail = data.get("equity", data).get("available", {})
+            return {
+                "mode":         "live",
+                "live_balance": round(avail.get("live_balance", 0.0), 2),
+                "collateral":   round(avail.get("collateral", 0.0), 2),
+                "net":          round(data.get("equity", data).get("net", 0.0), 2),
+            }
+
+        engine = _get_engine()
+        if engine and hasattr(engine.broker, "get_funds"):
+            funds = engine.broker.get_funds()
+            return {"mode": "forward_test", **funds}
+
+        return {"mode": "forward_test", "live_balance": 100_000.0, "collateral": 0.0, "net": 100_000.0}
+
+    except Exception as exc:
+        log.error("get_funds error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ── Holdings ──────────────────────────────────────────────────────────────────

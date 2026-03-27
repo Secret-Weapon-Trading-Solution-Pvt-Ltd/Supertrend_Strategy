@@ -29,6 +29,7 @@ from strategy import exit_manager
 from config.settings import settings
 from events.event_bus import emit_sync
 from models.trade import save_trade_sync
+from models.trade_log import save_trade_log_sync
 
 log = logging.getLogger(__name__)
 
@@ -327,6 +328,19 @@ class TradingEngine:
                     "pnl_amount":  summary["pnl_amount"],
                     "result":      summary["result"],
                 })
+                save_trade_log_sync({
+                    "event_type":  "EXIT_TRIGGERED",
+                    "symbol":      self.symbol,
+                    "broker_mode": settings.broker_mode,
+                    "details": {
+                        "reason":      exit_reason,
+                        "entry_price": summary["entry_price"],
+                        "exit_price":  summary["exit_price"],
+                        "pnl_points":  summary["pnl_points"],
+                        "pnl_amount":  summary["pnl_amount"],
+                        "result":      summary["result"],
+                    },
+                })
 
                 order_id = self.broker.place_order(
                     symbol=self.symbol, token=self.instrument_token,
@@ -338,6 +352,17 @@ class TradingEngine:
                     "type": "SELL", "symbol": self.symbol,
                     "qty": position.get("qty", self.qty),
                     "price": close, "order_id": order_id,
+                })
+                save_trade_log_sync({
+                    "event_type":  "ORDER_PLACED",
+                    "symbol":      self.symbol,
+                    "broker_mode": settings.broker_mode,
+                    "details": {
+                        "type":     "SELL",
+                        "qty":      position.get("qty", self.qty),
+                        "price":    close,
+                        "order_id": order_id,
+                    },
                 })
 
                 save_trade_sync({
@@ -392,8 +417,20 @@ class TradingEngine:
                         "required":  required,
                         "available": available,
                     })
+                    save_trade_log_sync({
+                        "event_type":  "FUNDS_INSUFFICIENT",
+                        "symbol":      self.symbol,
+                        "broker_mode": settings.broker_mode,
+                        "details": {"required": required, "available": available},
+                    })
                     return
 
+                save_trade_log_sync({
+                    "event_type":  "SIGNAL_BUY",
+                    "symbol":      self.symbol,
+                    "broker_mode": settings.broker_mode,
+                    "details":     {"price": close, "time": ts},
+                })
                 emit_sync("signal:buy", {"symbol": self.symbol, "price": close, "time": ts})
                 order_id = self.broker.place_order(
                     symbol=self.symbol, token=self.instrument_token,
@@ -405,6 +442,47 @@ class TradingEngine:
                     "type": "BUY", "symbol": self.symbol,
                     "qty": self.qty, "price": close, "order_id": order_id,
                 })
+                save_trade_log_sync({
+                    "event_type":  "ORDER_PLACED",
+                    "symbol":      self.symbol,
+                    "broker_mode": settings.broker_mode,
+                    "details": {
+                        "type":     "BUY",
+                        "qty":      self.qty,
+                        "price":    close,
+                        "order_id": order_id,
+                    },
+                })
+
+                # ── Wait for fill confirmation ─────────────────────────────
+                fill = self._wait_for_fill(order_id)
+                if fill["status"] == "COMPLETE":
+                    save_trade_log_sync({
+                        "event_type":  "ORDER_FILLED",
+                        "symbol":      self.symbol,
+                        "broker_mode": settings.broker_mode,
+                        "details": {
+                            "order_id":   order_id,
+                            "fill_price": fill["fill_price"],
+                            "qty":        fill["filled_qty"],
+                        },
+                    })
+                else:
+                    save_trade_log_sync({
+                        "event_type":  "ORDER_REJECTED" if fill["status"] in ("REJECTED", "CANCELLED") else "ORDER_TIMEOUT",
+                        "symbol":      self.symbol,
+                        "broker_mode": settings.broker_mode,
+                        "details": {
+                            "order_id": order_id,
+                            "status":   fill["status"],
+                            "reason":   fill["rejection_reason"],
+                        },
+                    })
+                    log.warning(
+                        "[ENGINE] BUY not confirmed — status=%s | aborting position tracking",
+                        fill["status"],
+                    )
+                    return  # don't track position — order didn't fill
 
     # ── Exit all positions (called on engine stop) ─────────────────────────────
 
@@ -470,6 +548,77 @@ class TradingEngine:
                 "entry_time":       position.get("entry_time"),
                 "exit_time":        None,
             })
+
+    # ── Order fill confirmation ────────────────────────────────────────────────
+
+    def _wait_for_fill(self, order_id: str, max_attempts: int = 10,
+                       interval: float = 0.5) -> dict:
+        """
+        Poll broker.get_order_status() until the order is COMPLETE/REJECTED.
+
+        Args:
+            order_id    : order_id returned by place_order()
+            max_attempts: max number of polls before giving up (default 10)
+            interval    : seconds between polls (default 0.5s → max 5s wait)
+
+        Returns:
+            dict with keys: status, fill_price, filled_qty, rejection_reason
+              status = "COMPLETE" | "REJECTED" | "CANCELLED" | "TIMEOUT"
+        """
+        terminal = {"COMPLETE", "REJECTED", "CANCELLED"}
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                order = self.broker.get_order_status(order_id)
+                status = order.get("status", "")
+
+                log.info(
+                    "[FILL] poll #%d — order_id=%s status=%s",
+                    attempt, order_id, status,
+                )
+
+                if status in terminal:
+                    result = {
+                        "status":           status,
+                        "fill_price":       float(order.get("average_price") or 0),
+                        "filled_qty":       int(order.get("filled_quantity") or 0),
+                        "rejection_reason": order.get("status_message", ""),
+                    }
+
+                    if status == "COMPLETE":
+                        log.info(
+                            "[FILL] COMPLETE — order_id=%s fill=%.2f qty=%d",
+                            order_id, result["fill_price"], result["filled_qty"],
+                        )
+                        emit_sync("order:filled", {
+                            "order_id":   order_id,
+                            "fill_price": result["fill_price"],
+                            "qty":        result["filled_qty"],
+                            "symbol":     self.symbol,
+                        })
+                    else:
+                        log.warning(
+                            "[FILL] %s — order_id=%s reason=%s",
+                            status, order_id, result["rejection_reason"],
+                        )
+                        emit_sync("order:rejected", {
+                            "order_id": order_id,
+                            "status":   status,
+                            "reason":   result["rejection_reason"],
+                            "symbol":   self.symbol,
+                        })
+
+                    return result
+
+            except Exception as exc:
+                log.error("[FILL] poll #%d error: %s", attempt, exc)
+
+            time.sleep(interval)
+
+        # Timed out — order still not terminal after max_attempts
+        log.warning("[FILL] TIMEOUT — order_id=%s not confirmed after %.1fs", order_id, max_attempts * interval)
+        emit_sync("order:timeout", {"order_id": order_id, "symbol": self.symbol})
+        return {"status": "TIMEOUT", "fill_price": 0.0, "filled_qty": 0, "rejection_reason": "timeout"}
 
     # ── Buffer helpers ─────────────────────────────────────────────────────────
 

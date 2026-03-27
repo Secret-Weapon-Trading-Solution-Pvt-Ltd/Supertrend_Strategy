@@ -47,6 +47,7 @@ from engine.trading_engine import TradingEngine
 from events.event_bus import emit, set_loop, sio
 from events.log_handler import install as install_log_handler
 from models.trade import set_loop as set_trade_loop
+from models.trade_log import set_loop as set_trade_log_loop, get_trade_logs
 from models.account import Account
 from models.timeframe import Timeframe
 from models.database import async_session, init_db
@@ -122,6 +123,7 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     set_loop(loop)
     set_trade_loop(loop)
+    set_trade_log_loop(loop)
 
     # Install Socket.IO log handler — all logs stream to frontend from now
     install_log_handler()
@@ -221,9 +223,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown — run in thread, shutdown() calls place_order (blocking HTTP)
     if _engine:
-        _engine.shutdown()
+        await asyncio.to_thread(_engine.shutdown)
     scheduler.shutdown()
     log.info("Scheduler: stopped")
 
@@ -584,8 +586,8 @@ async def on_engine_start(sid, data: dict):
 async def on_engine_stop(sid, data: dict):
     if not _engine:
         return
-    # Exit positions + block orders — loop keeps running (data/indicators continue)
-    _engine.stop()
+    # Run in thread — stop() calls place_order (blocking HTTP), must not block event loop
+    await asyncio.to_thread(_engine.stop)
     await emit("engine:state", _engine.status())
 
 
@@ -679,7 +681,7 @@ async def on_mode_switch(sid, data: dict):
         interval = _engine.interval
         exchange = _engine.exchange
 
-        _engine.stop()
+        await asyncio.to_thread(_engine.stop)
         broker  = create_broker(_access_token)
         _engine = TradingEngine(
             broker           = broker,
@@ -867,6 +869,17 @@ async def on_indicators_unsubscribe(sid: str, data: dict) -> None:
         _ind_tasks[sid].cancel()
         del _ind_tasks[sid]
     log.info("indicators:unsubscribe — sid=%s", sid)
+
+
+@sio.on("tradelog:fetch")
+async def on_tradelog_fetch(sid: str, data: dict) -> None:
+    """
+    Client sends {limit?} → server returns last N trade log entries.
+    Emits "tradelog:history" back to that client only.
+    """
+    limit = int(data.get("limit", 100)) if data else 100
+    logs  = await get_trade_logs(limit)
+    await sio.emit("tradelog:history", logs, to=sid)
 
 
 @sio.event

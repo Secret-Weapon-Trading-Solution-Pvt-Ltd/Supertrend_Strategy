@@ -18,7 +18,7 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Create all tables on startup and seed static data if not present."""
-    from models import account, trade, position, instrument, timeframe   # noqa: F401 — register models
+    from models import account, trade, position, instrument, timeframe, trade_log   # noqa: F401 — register models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await _seed_timeframes()

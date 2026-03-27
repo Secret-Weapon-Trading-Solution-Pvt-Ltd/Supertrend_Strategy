@@ -41,6 +41,10 @@ export type Exchange = 'NSE' | 'NFO' | 'BSE' | 'MCX'
 
 export type IndicatorName = 'supertrend' | 'atr'
 
+export type TargetType = 'points' | 'percentage' | 'atr_multiple'
+
+export type SlType = 'points' | 'percentage'
+
 
 // ── SOCKET.IO — SERVER → CLIENT PAYLOADS ─────────────────────────────────────
 
@@ -140,6 +144,21 @@ export interface IndicatorStatePayload {
   name:    IndicatorName
   enabled: boolean
 }
+
+/** Emitted after exit:settings or exit:settings:get — full current settings snapshot */
+export interface ExitSettingsPayload {
+  target_type:      TargetType
+  target_value:     number
+  sl_type:          SlType
+  sl_value:         number
+  trailing_sl:      boolean
+  trail_value:      number
+  exit_on_st_red:   boolean
+  session_end_time: string   // "HH:MM"
+}
+
+/** Sent by client to update exit settings — all fields optional (partial update) */
+export type UpdateExitSettingsPayload = Partial<ExitSettingsPayload>
 
 /** Emitted after indicator:settings */
 export interface IndicatorSettingsAppliedPayload {
@@ -450,6 +469,9 @@ export const EVENTS = {
   SOCKET_ERROR:               'SOCKET_ERROR',
   WS_CONNECTED:          'WS_CONNECTED',
   WS_DISCONNECTED:       'WS_DISCONNECTED',
+
+  // Exit settings
+  EXIT_SETTINGS_APPLIED: 'EXIT_SETTINGS_APPLIED',
 
   // Trade log (activity feed)
   TRADELOG_RECEIVED:     'TRADELOG_RECEIVED',

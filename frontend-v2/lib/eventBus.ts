@@ -37,6 +37,7 @@ import type {
   IndicatorSettingsPayload,
   IndicatorStatePayload,
   IndicatorSettingsAppliedPayload,
+  ExitSettingsPayload,
   TickPayload,
   SignalBuyPayload,
   OrderPlacedPayload,
@@ -79,6 +80,7 @@ export interface EventPayloadMap {
   LOG_RECEIVED:               LogPayload
   INDICATOR_STATE:            IndicatorStatePayload
   INDICATOR_SETTINGS_APPLIED: IndicatorSettingsAppliedPayload
+  EXIT_SETTINGS_APPLIED:      ExitSettingsPayload
   MODE_STATE:                 ModeStatePayload
   SOCKET_ERROR:               ErrorPayload
 

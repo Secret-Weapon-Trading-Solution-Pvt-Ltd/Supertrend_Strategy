@@ -27,6 +27,8 @@ import type {
   IndicatorTogglePayload,
   IndicatorSettingsPayload,
   IndicatorsSubscribePayload,
+  ExitSettingsPayload,
+  UpdateExitSettingsPayload,
   TickPayload,
   SignalBuyPayload,
   OrderPlacedPayload,
@@ -149,6 +151,10 @@ function _registerEventHandlers(s: Socket): void {
     eventBus.emit(EVENTS.INDICATOR_SETTINGS_APPLIED, data)
   })
 
+  s.on('exit:settings:applied', (data: ExitSettingsPayload) => {
+    eventBus.emit(EVENTS.EXIT_SETTINGS_APPLIED, data)
+  })
+
   // ── Mode confirmation ─────────────────────────────────────────────────────
 
   s.on('mode:state', (data: ModeStatePayload) => {
@@ -236,6 +242,18 @@ export function unsubscribeIndicators(): void {
   // or TIMEFRAME_CHANGED. Emitting reset here would wipe state on every
   // component unmount (page nav, tab switch) — not just on symbol/tf change.
   getSocket().emit('indicators:unsubscribe', {})
+}
+
+// ── Exit settings helpers ─────────────────────────────────────────────────────
+
+/** Request current exit settings — backend replies with exit:settings:applied to this client only */
+export function getExitSettings(): void {
+  getSocket().emit('exit:settings:get', {})
+}
+
+/** Update exit settings at runtime — partial payload, changes take effect on next tick */
+export function updateExitSettings(payload: UpdateExitSettingsPayload): void {
+  getSocket().emit('exit:settings', payload)
 }
 
 // ── Trade log helpers ─────────────────────────────────────────────────────────

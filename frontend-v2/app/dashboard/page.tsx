@@ -24,12 +24,12 @@ import {
   connectSocket, disconnectSocket,
   startEngine, stopEngine, pauseEngine, resumeEngine,
   subscribeIndicators, unsubscribeIndicators,
-  switchMode,
+  switchMode, getExitSettings, updateExitSettings,
 } from '@/lib/socket'
 import { getStatus, getTimeframes, getTrades } from '@/lib/api'
 import { eventBus }          from '@/lib/eventBus'
 import { EVENTS }            from '@/types/types'
-import type { Instrument }   from '@/types/types'
+import type { Instrument, ExitSettingsPayload, TargetType, SlType } from '@/types/types'
 import { SymbolSelector }      from '@/components/SymbolSelector'
 import { TimeframeSelector }   from '@/components/TimeframeSelector'
 import { IndicatorsPanel }     from '@/components/IndicatorsPanel'
@@ -44,6 +44,17 @@ export default function DashboardPage() {
 
   const [qtyInput, setQtyInput] = useState('')
   const [indOpen,  setIndOpen]  = useState(false)
+
+  const [exitSettings, setExitSettings] = useState<ExitSettingsPayload>({
+    target_type:      'points',
+    target_value:     20,
+    sl_type:          'points',
+    sl_value:         10,
+    trailing_sl:      true,
+    trail_value:      5,
+    exit_on_st_red:   true,
+    session_end_time: '15:15',
+  })
 
   function handleSymbolSelect(inst: Instrument) {
     setSymbol(inst)
@@ -83,6 +94,21 @@ export default function DashboardPage() {
     init()
     return () => disconnectSocket()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Exit settings sync ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onApplied = (data: ExitSettingsPayload) => setExitSettings(data)
+    eventBus.on(EVENTS.EXIT_SETTINGS_APPLIED, onApplied)
+
+    // Fetch current settings once WS connects
+    const onConnected = () => getExitSettings()
+    eventBus.on(EVENTS.WS_CONNECTED, onConnected)
+
+    return () => {
+      eventBus.off(EVENTS.EXIT_SETTINGS_APPLIED, onApplied)
+      eventBus.off(EVENTS.WS_CONNECTED, onConnected)
+    }
   }, [])
 
   // ── Indicator subscribe ───────────────────────────────────────────────────
@@ -478,6 +504,18 @@ export default function DashboardPage() {
 
       </div>
 
+      {/* ════════════════ EXIT CONDITIONS ════════════════════════════════════ */}
+      <div className="shrink-0 px-6 pb-4">
+        <ExitSettingsCard
+          settings={exitSettings}
+          onChange={(patch) => {
+            const next = { ...exitSettings, ...patch }
+            setExitSettings(next)
+            updateExitSettings(patch)
+          }}
+        />
+      </div>
+
       {/* ════════════════ SCROLLABLE CONTENT ════════════════════════════════ */}
       <div className="flex-1 overflow-y-auto px-5 pt-6 pb-5 flex flex-col gap-4">
 
@@ -611,6 +649,397 @@ function LiveCard({
         {tag && <div>{tag}</div>}
       </div>
     </div>
+  )
+}
+
+// ── ExitSettingsCard ──────────────────────────────────────────────────────────
+
+function ExitSettingsCard({
+  settings,
+  onChange,
+}: {
+  settings: ExitSettingsPayload
+  onChange: (patch: Partial<ExitSettingsPayload>) => void
+}) {
+  const [draft, setDraft] = useState({
+    target_value:     String(settings.target_value),
+    sl_value:         String(settings.sl_value),
+    trail_value:      String(settings.trail_value),
+    session_end_time: settings.session_end_time,
+  })
+
+  useEffect(() => {
+    setDraft({
+      target_value:     String(settings.target_value),
+      sl_value:         String(settings.sl_value),
+      trail_value:      String(settings.trail_value),
+      session_end_time: settings.session_end_time,
+    })
+  }, [settings.target_value, settings.sl_value, settings.trail_value, settings.session_end_time])
+
+  function commitNumber(field: 'target_value' | 'sl_value' | 'trail_value') {
+    const v = parseFloat(draft[field])
+    if (!isNaN(v) && v > 0) onChange({ [field]: v })
+  }
+
+  function commitTime() {
+    if (/^\d{2}:\d{2}$/.test(draft.session_end_time))
+      onChange({ session_end_time: draft.session_end_time })
+  }
+
+  const unitLabel = (type: 'points' | 'percentage') =>
+    type === 'points' ? 'points' : '%'
+
+  return (
+    <div
+      className="rounded-2xl px-6 py-5"
+      style={{
+        background:     'var(--theme-glass-card)',
+        border:         '1px solid var(--theme-glass-border)',
+        backdropFilter: 'blur(20px) saturate(160%)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2.5 mb-5">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+          className="w-4 h-4 shrink-0" style={{ color: 'var(--theme-accent)' }}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--theme-text-ghost)' }}>
+          Exit Conditions
+        </p>
+        <p className="text-xs ml-1" style={{ color: 'var(--theme-text-ghost)' }}>
+          — rules that auto-close your position
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-0" style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--theme-glass-border)' }}>
+
+        {/* ── Row 1: Take Profit ──────────────────────────────────────────── */}
+        <ExitRow
+          color="var(--theme-profit)"
+          bg="var(--theme-profit-bg)"
+          border="var(--theme-profit-border)"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <polyline strokeLinecap="round" strokeLinejoin="round" points="22 7 13.5 15.5 8.5 10.5 2 17" />
+              <polyline strokeLinecap="round" strokeLinejoin="round" points="16 7 22 7 22 13" />
+            </svg>
+          }
+          label="Take Profit"
+          description={
+            settings.target_type === 'points'
+              ? `Exit when price rises ${draft.target_value} pts above entry`
+              : `Exit when price rises ${draft.target_value}% above entry`
+          }
+        >
+          <TypePill
+            options={[
+              { value: 'points',     label: 'Fixed Points' },
+              { value: 'percentage', label: 'Percentage %' },
+            ]}
+            active={settings.target_type === 'points' ? 'points' : 'percentage'}
+            onSelect={v => onChange({ target_type: v as TargetType })}
+            activeColor="var(--theme-profit)"
+            activeBg="var(--theme-profit-bg)"
+            activeBorder="var(--theme-profit-border)"
+          />
+          <NumberInput
+            value={draft.target_value}
+            unit={unitLabel(settings.target_type === 'points' ? 'points' : 'percentage')}
+            onChange={v => setDraft(d => ({ ...d, target_value: v }))}
+            onBlur={() => commitNumber('target_value')}
+          />
+        </ExitRow>
+
+        <RowDivider />
+
+        {/* ── Row 2: Stop Loss ────────────────────────────────────────────── */}
+        <ExitRow
+          color="var(--theme-loss)"
+          bg="var(--theme-loss-bg)"
+          border="var(--theme-loss-border)"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <polyline strokeLinecap="round" strokeLinejoin="round" points="22 17 13.5 8.5 8.5 13.5 2 7" />
+              <polyline strokeLinecap="round" strokeLinejoin="round" points="16 17 22 17 22 11" />
+            </svg>
+          }
+          label="Stop Loss"
+          description={
+            settings.sl_type === 'points'
+              ? `Exit when price drops ${draft.sl_value} pts below entry`
+              : `Exit when price drops ${draft.sl_value}% below entry`
+          }
+        >
+          <TypePill
+            options={[
+              { value: 'points',     label: 'Fixed Points' },
+              { value: 'percentage', label: 'Percentage %' },
+            ]}
+            active={settings.sl_type}
+            onSelect={v => onChange({ sl_type: v as SlType })}
+            activeColor="var(--theme-loss)"
+            activeBg="var(--theme-loss-bg)"
+            activeBorder="var(--theme-loss-border)"
+          />
+          <NumberInput
+            value={draft.sl_value}
+            unit={unitLabel(settings.sl_type)}
+            onChange={v => setDraft(d => ({ ...d, sl_value: v }))}
+            onBlur={() => commitNumber('sl_value')}
+          />
+        </ExitRow>
+
+        <RowDivider />
+
+        {/* ── Row 3: Trailing Stop Loss ────────────────────────────────────── */}
+        <ExitRow
+          color="var(--theme-warn)"
+          bg="var(--theme-warn-bg)"
+          border="var(--theme-warn-border)"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          }
+          label="Trailing Stop Loss"
+          description={
+            settings.trailing_sl
+              ? `SL moves up with price — exits if price drops ${draft.trail_value} pts from peak`
+              : 'Disabled — stop loss stays fixed at entry level'
+          }
+        >
+          <ToggleSwitch
+            on={settings.trailing_sl}
+            onToggle={() => onChange({ trailing_sl: !settings.trailing_sl })}
+            color="var(--theme-warn)"
+            bg="var(--theme-warn-bg)"
+            border="var(--theme-warn-border)"
+          />
+          {settings.trailing_sl && (
+            <NumberInput
+              value={draft.trail_value}
+              unit="pts"
+              onChange={v => setDraft(d => ({ ...d, trail_value: v }))}
+              onBlur={() => commitNumber('trail_value')}
+            />
+          )}
+        </ExitRow>
+
+        <RowDivider />
+
+        {/* ── Row 4: Supertrend Red ────────────────────────────────────────── */}
+        <ExitRow
+          color="var(--theme-loss)"
+          bg="var(--theme-loss-bg)"
+          border="var(--theme-loss-border)"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+            </svg>
+          }
+          label="Exit on Supertrend Red"
+          description={
+            settings.exit_on_st_red
+              ? 'Exit immediately when Supertrend flips from green (bullish) to red (bearish)'
+              : 'Disabled — Supertrend flip will not trigger an exit'
+          }
+        >
+          <ToggleSwitch
+            on={settings.exit_on_st_red}
+            onToggle={() => onChange({ exit_on_st_red: !settings.exit_on_st_red })}
+            color="var(--theme-loss)"
+            bg="var(--theme-loss-bg)"
+            border="var(--theme-loss-border)"
+          />
+        </ExitRow>
+
+        <RowDivider />
+
+        {/* ── Row 5: Session End ───────────────────────────────────────────── */}
+        <ExitRow
+          color="var(--theme-accent)"
+          bg="var(--theme-accent-soft)"
+          border="var(--theme-accent-border)"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <circle cx="12" cy="12" r="10" />
+              <polyline strokeLinecap="round" strokeLinejoin="round" points="12 6 12 12 16 14" />
+            </svg>
+          }
+          label="Session End — Force Exit"
+          description={`Force-close all open positions at ${draft.session_end_time} IST (NSE market close)`}
+        >
+          <input
+            type="time"
+            value={draft.session_end_time}
+            onChange={e => setDraft(d => ({ ...d, session_end_time: e.target.value }))}
+            onBlur={commitTime}
+            className="h-9 w-28 rounded-xl px-3 text-sm font-mono font-bold focus:outline-none"
+            style={{
+              background:  'var(--theme-input-bg)',
+              border:      '1px solid var(--theme-input-border)',
+              color:       'var(--theme-input-text)',
+              colorScheme: 'dark',
+            }}
+          />
+        </ExitRow>
+
+      </div>
+    </div>
+  )
+}
+
+// ── ExitRow — one condition row ───────────────────────────────────────────────
+
+function ExitRow({
+  color, bg, border, icon, label, description, children,
+}: {
+  color:       string
+  bg:          string
+  border:      string
+  icon:        React.ReactNode
+  label:       string
+  description: string
+  children:    React.ReactNode
+}) {
+  return (
+    <div
+      className="flex items-center gap-5 px-5 py-3.5"
+      style={{ background: 'var(--theme-glass-panel)' }}
+    >
+      {/* Left accent icon */}
+      <div
+        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: bg, border: `1px solid ${border}`, color }}
+      >
+        {icon}
+      </div>
+
+      {/* Label + description */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold leading-none mb-1" style={{ color: 'var(--theme-text-primary)' }}>
+          {label}
+        </p>
+        <p className="text-xs leading-snug" style={{ color: 'var(--theme-text-muted)' }}>
+          {description}
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ── TypePill — Points / Percentage selector ────────────────────────────────────
+
+function TypePill({
+  options, active, onSelect,
+  activeColor, activeBg, activeBorder,
+}: {
+  options:       { value: string; label: string }[]
+  active:        string
+  onSelect:      (v: string) => void
+  activeColor:   string
+  activeBg:      string
+  activeBorder:  string
+}) {
+  return (
+    <div
+      className="flex rounded-xl overflow-hidden"
+      style={{ border: '1px solid var(--theme-glass-border)' }}
+    >
+      {options.map((opt, i) => (
+        <button
+          key={opt.value}
+          onClick={() => onSelect(opt.value)}
+          className="px-3 py-1.5 text-xs font-bold transition-colors"
+          style={{
+            background:  active === opt.value ? activeBg      : 'transparent',
+            color:       active === opt.value ? activeColor   : 'var(--theme-text-muted)',
+            borderRight: i < options.length - 1 ? '1px solid var(--theme-glass-border)' : 'none',
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── NumberInput ───────────────────────────────────────────────────────────────
+
+function NumberInput({
+  value, unit, onChange, onBlur,
+}: {
+  value:    string
+  unit:     string
+  onChange: (v: string) => void
+  onBlur:   () => void
+}) {
+  return (
+    <div
+      className="flex items-center gap-1.5 h-9 px-3 rounded-xl"
+      style={{
+        background: 'var(--theme-input-bg)',
+        border:     '1px solid var(--theme-input-border)',
+      }}
+    >
+      <input
+        type="number" min={0.1} step={0.5}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onBlur={onBlur}
+        className="w-12 bg-transparent text-sm font-mono font-bold text-center focus:outline-none"
+        style={{ color: 'var(--theme-input-text)' }}
+      />
+      <span className="text-xs font-semibold" style={{ color: 'var(--theme-text-ghost)' }}>
+        {unit}
+      </span>
+    </div>
+  )
+}
+
+// ── RowDivider ────────────────────────────────────────────────────────────────
+
+function RowDivider() {
+  return <div className="h-px" style={{ background: 'var(--theme-glass-border)' }} />
+}
+
+// ── ToggleSwitch ──────────────────────────────────────────────────────────────
+
+function ToggleSwitch({
+  on, onToggle, color, bg, border,
+}: {
+  on:       boolean
+  onToggle: () => void
+  color:    string
+  bg:       string
+  border:   string
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="relative w-10 h-5.5 rounded-full transition-all shrink-0"
+      style={{
+        background: on ? bg      : 'var(--theme-glass-panel)',
+        border:     `1px solid ${on ? border : 'var(--theme-glass-border)'}`,
+      }}
+    >
+      <span
+        className="absolute top-0.5 w-4 h-4 rounded-full transition-all"
+        style={{
+          left:       on ? 'calc(100% - 1.1rem)' : '0.15rem',
+          background: on ? color : 'var(--theme-text-ghost)',
+          boxShadow:  on ? `0 0 6px ${color}` : 'none',
+        }}
+      />
+    </button>
   )
 }
 

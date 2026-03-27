@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 
 import zeroda
 from config.settings import settings
+from broker.forward_test import ForwardTestBroker
 
 router = APIRouter(prefix="/api", tags=["portfolio"])
 log    = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ async def get_funds():
             }
 
         engine = _get_engine()
-        if engine and hasattr(engine.broker, "get_funds"):
+        if engine and isinstance(engine.broker, ForwardTestBroker):
             funds = engine.broker.get_funds()
             return {"mode": "forward_test", **funds}
 
@@ -93,7 +94,7 @@ async def get_holdings():
 
         # Forward test — return virtual capital summary
         engine = _get_engine()
-        if engine and hasattr(engine.broker, "get_holdings"):
+        if engine and isinstance(engine.broker, ForwardTestBroker):
             ft_holdings = engine.broker.get_holdings()
             return {"mode": "forward_test", "holdings": ft_holdings}
 
@@ -149,7 +150,7 @@ async def get_positions():
 
         # Forward test — return virtual position
         engine = _get_engine()
-        if engine:
+        if engine and isinstance(engine.broker, ForwardTestBroker):
             pos_list = engine.broker.get_positions()
             return {"mode": "forward_test", "positions": pos_list}
 

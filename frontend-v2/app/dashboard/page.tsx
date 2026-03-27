@@ -21,7 +21,6 @@ import { useMarket } from '@/store/MarketStore'
 import { useTrade }  from '@/store/TradeStore'
 
 import {
-  connectSocket, disconnectSocket,
   startEngine, stopEngine, pauseEngine, resumeEngine,
   subscribeIndicators, unsubscribeIndicators,
   switchMode, getExitSettings, updateExitSettings,
@@ -89,10 +88,8 @@ export default function DashboardPage() {
         if (tfs.length > 0 && !engine.selectedTimeframe) setTimeframe(tfs[0])
       } catch (e) { console.error('timeframes:', e) }
       try { setTrades(await getTrades()) } catch (e) { console.error('trades:', e) }
-      connectSocket()
     }
     init()
-    return () => disconnectSocket()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

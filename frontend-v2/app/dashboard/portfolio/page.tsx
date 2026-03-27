@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getHoldings, getPositions, getFunds } from '@/lib/api'
+import { useEngine } from '@/store/EngineStore'
 import type {
   HoldingsResponse, PositionsResponse, FundsResponse,
   LiveHolding, ForwardTestHolding,
@@ -9,17 +10,19 @@ import type {
 } from '@/types/types'
 
 export default function PortfolioPage() {
+  const { state: engine } = useEngine()
   const [holdings,  setHoldings]  = useState<HoldingsResponse | null>(null)
   const [positions, setPositions] = useState<PositionsResponse | null>(null)
   const [funds,     setFunds]     = useState<FundsResponse | null>(null)
   const [loading,   setLoading]   = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     Promise.all([getHoldings(), getPositions(), getFunds()])
       .then(([h, p, f]) => { setHoldings(h); setPositions(p); setFunds(f) })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [engine.brokerMode])
 
   const isLive = holdings?.mode === 'live'
 

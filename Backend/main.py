@@ -12,6 +12,11 @@ Socket events (client → server):
   engine:resume      {}
   position:exit      {}   — manually exit open position, engine stays RUNNING
   indicator:toggle   {name: "supertrend"|"atr", enabled: bool}
+  indicator:settings {name: "supertrend", length: int, multiplier: float}
+                     {name: "atr", period: int, threshold: float}
+  exit:settings      {target_type?, target_value?, sl_type?, sl_value?,
+                      trailing_sl?, trail_value?, exit_on_st_red?, session_end_time?}
+  exit:settings:get  {}                        → returns exit:settings:applied
   mode:switch        {mode: "forward_test"|"live"}
   instruments:search {query, exchange?}   → returns instruments:results
   trades:history     {limit?}             → returns trades:history
@@ -25,7 +30,12 @@ Socket events (server → client):
   engine:state       {state, symbol, interval}
   timeframes         [{interval, label, minutes}]
   instruments:results [{symbol, token, name, exchange, segment}]
-  log                {level, logger, message, timestamp}
+  indicator:state             {name, enabled}
+  indicator:settings:applied  {name, ...params}
+  exit:settings:applied       {target_type, target_value, sl_type, sl_value,
+                               trailing_sl, trail_value, exit_on_st_red, session_end_time}
+  mode:state                  {mode}
+  log                         {level, logger, message, timestamp}
 """
 
 import asyncio
@@ -664,6 +674,86 @@ async def on_indicator_settings(sid, data: dict):
 
     else:
         await sio.emit("error", {"message": f"Unknown indicator: {name}"}, to=sid)
+
+
+@sio.on("exit:settings")
+async def on_exit_settings(sid, data: dict):
+    """
+    Update exit condition parameters at runtime — no engine restart needed.
+    exit_manager.check() reads settings live on every tick so changes take
+    effect immediately on the next tick.
+
+    Any subset of fields can be sent — only provided keys are updated.
+    data: {
+        target_type?:      "points" | "percentage" | "atr_multiple"
+        target_value?:     float
+        sl_type?:          "points" | "percentage"
+        sl_value?:         float
+        trailing_sl?:      bool
+        trail_value?:      float
+        exit_on_st_red?:   bool
+        session_end_time?: "HH:MM"
+    }
+    """
+    if "target_type" in data:
+        val = data["target_type"]
+        if val not in ("points", "percentage", "atr_multiple"):
+            await sio.emit("error", {"message": f"Invalid target_type: {val}"}, to=sid)
+            return
+        settings.target_type = val
+
+    if "target_value" in data:
+        settings.target_value = float(data["target_value"])
+
+    if "sl_type" in data:
+        val = data["sl_type"]
+        if val not in ("points", "percentage"):
+            await sio.emit("error", {"message": f"Invalid sl_type: {val}"}, to=sid)
+            return
+        settings.sl_type = val
+
+    if "sl_value" in data:
+        settings.sl_value = float(data["sl_value"])
+
+    if "trailing_sl" in data:
+        settings.trailing_sl = bool(data["trailing_sl"])
+
+    if "trail_value" in data:
+        settings.trail_value = float(data["trail_value"])
+
+    if "exit_on_st_red" in data:
+        settings.exit_on_st_red = bool(data["exit_on_st_red"])
+
+    if "session_end_time" in data:
+        settings.session_end_time = str(data["session_end_time"])
+
+    log.info(
+        "Exit settings updated — target=%s/%.2f | sl=%s/%.2f | trail=%s/%.2f | st_red=%s | session_end=%s",
+        settings.target_type, settings.target_value,
+        settings.sl_type, settings.sl_value,
+        settings.trailing_sl, settings.trail_value,
+        settings.exit_on_st_red, settings.session_end_time,
+    )
+    await emit("exit:settings:applied", _current_exit_settings())
+
+
+@sio.on("exit:settings:get")
+async def on_exit_settings_get(sid, data: dict):
+    """Return current exit settings to the requesting client only (for settings page load)."""
+    await sio.emit("exit:settings:applied", _current_exit_settings(), to=sid)
+
+
+def _current_exit_settings() -> dict:
+    return {
+        "target_type":      settings.target_type,
+        "target_value":     settings.target_value,
+        "sl_type":          settings.sl_type,
+        "sl_value":         settings.sl_value,
+        "trailing_sl":      settings.trailing_sl,
+        "trail_value":      settings.trail_value,
+        "exit_on_st_red":   settings.exit_on_st_red,
+        "session_end_time": settings.session_end_time,
+    }
 
 
 @sio.on("mode:switch")

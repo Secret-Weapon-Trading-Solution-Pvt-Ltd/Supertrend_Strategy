@@ -44,6 +44,10 @@ class ForwardTestBroker(BrokerABC):
         # Virtual order book {order_id: order_dict}
         self._orders: dict[str, dict] = {}
 
+        # symbol → token cache — populated on every place_order call
+        # Used by get_order_margin() to fetch correct LTP for margin estimate
+        self._token_cache: dict[str, int] = {}
+
     # ── Orders ────────────────────────────────────────────────────────────────
 
     def place_order(
@@ -65,6 +69,9 @@ class ForwardTestBroker(BrokerABC):
         """
         order_id  = str(uuid.uuid4())[:8]
         timestamp = datetime.now()
+
+        # Cache symbol → token for use in get_order_margin()
+        self._token_cache[symbol] = token
 
         # Determine fill price
         fill_price = price if price > 0 else self._get_ltp(token)
@@ -96,7 +103,21 @@ class ForwardTestBroker(BrokerABC):
             log.info("[FT] Order %s cancelled", order_id)
 
     def get_order_status(self, order_id: str) -> dict:
-        return self._orders.get(order_id, {})
+        """
+        Returns order status with Zerodha-compatible keys so _wait_for_fill()
+        in the engine works identically in both forward_test and live mode.
+          fill_price  → average_price
+          qty         → filled_quantity
+        """
+        order = self._orders.get(order_id, {})
+        if not order:
+            return {}
+        return {
+            "status":           order.get("status", ""),
+            "average_price":    order.get("fill_price", 0.0),
+            "filled_quantity":  order.get("qty", 0),
+            "status_message":   "",
+        }
 
     # ── Position ──────────────────────────────────────────────────────────────
 
@@ -237,10 +258,14 @@ class ForwardTestBroker(BrokerABC):
     def get_order_margin(self, symbol: str, qty: int, transaction_type: str,
                          product: str, exchange: str = "NSE") -> float:
         """
-        In forward test, required margin = fill_price * qty.
-        Uses live LTP to estimate cost.
+        In forward test, required margin = LTP × qty.
+        Looks up the correct token from _token_cache (populated on place_order).
+        Falls back to position token if cache miss, then 0 if neither available.
         """
-        ltp = self._get_ltp(self.position["token"] if self.position else 0)
+        token = self._token_cache.get(symbol) or (
+            self.position["token"] if self.position else 0
+        )
+        ltp = self._get_ltp(token)
         return round(ltp * qty, 2) if ltp else 0.0
 
     # ── Summary ───────────────────────────────────────────────────────────────

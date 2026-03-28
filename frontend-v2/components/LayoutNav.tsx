@@ -68,7 +68,7 @@ const NAV = [
   },
 ]
 
-export function LayoutNav() {
+export function LayoutNav({ onClose }: { onClose?: () => void }) {
   const pathname          = usePathname()
   const router            = useRouter()
   const { state: auth, logout } = useAuth()
@@ -99,7 +99,7 @@ export function LayoutNav() {
     : '?'
 
   return (
-    <nav className="glass-panel shrink-0 w-72 flex flex-col overflow-y-auto">
+    <nav className="glass-panel shrink-0 w-72 flex flex-col overflow-y-auto h-full">
 
       {/* Brand */}
       <div
@@ -131,11 +131,29 @@ export function LayoutNav() {
         </div>
 
         <p
-          className="font-display text-xl font-black tracking-widest"
+          className="font-display text-xl font-black tracking-widest flex-1"
           style={{ color: 'var(--theme-accent)' }}
         >
           TrendEdge
         </p>
+
+        {/* Close button — only shown on mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-all shrink-0"
+            style={{
+              background: 'var(--theme-glass-card)',
+              border:     '1px solid var(--theme-glass-border)',
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+              className="w-4 h-4" style={{ color: 'var(--theme-text-muted)' }}>
+              <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" />
+              <line x1="6"  y1="6" x2="18" y2="18" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Nav items */}
@@ -146,6 +164,7 @@ export function LayoutNav() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150"
               style={{
                 background: active ? 'var(--theme-accent-soft)'   : 'transparent',

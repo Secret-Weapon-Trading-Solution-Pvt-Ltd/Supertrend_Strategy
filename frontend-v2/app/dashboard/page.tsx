@@ -68,6 +68,11 @@ export default function DashboardPage() {
     setSymbol(inst)
     eventBus.emit(EVENTS.SYMBOL_CHANGED, inst)
     eventBus.emit(EVENTS.RESET_MARKET_DATA, undefined)
+    // Auto-fill qty with lot size for derivatives (FUT/CE/PE)
+    if ((inst.type === 'FUT' || inst.type === 'CE' || inst.type === 'PE') && inst.lot_size > 1) {
+      setQtyInput(String(inst.lot_size))
+      setQty(inst.lot_size)
+    }
   }
 
   function handleSelectTf(tf: (typeof engine.availableTimeframes)[0]) {

@@ -2,15 +2,27 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { LayoutNav } from '@/components/LayoutNav'
-import { connectSocket, disconnectSocket } from '@/lib/socket'
+import { connectSocket, disconnectSocket, subscribeIndicators, unsubscribeIndicators } from '@/lib/socket'
+import { useEngine } from '@/store/EngineStore'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false)
+  const { state: engine } = useEngine()
 
   useEffect(() => {
     connectSocket()
     return () => disconnectSocket()
   }, [])
+
+  // Manage indicator subscription here (in the layout) so it persists
+  // across navigation between dashboard sub-pages without dropping the stream.
+  useEffect(() => {
+    const sym = engine.selectedSymbol
+    const tf  = engine.selectedTimeframe
+    if (!sym || !tf) return
+    subscribeIndicators({ token: sym.token, interval: tf.interval })
+    return () => unsubscribeIndicators()
+  }, [engine.selectedSymbol?.token, engine.selectedTimeframe?.interval])
 
   // Close nav on route change (when a link is clicked inside nav on mobile)
   function closeNav() { setNavOpen(false) }

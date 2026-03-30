@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMarket } from '@/store/MarketStore'
 import { toggleIndicator, updateIndicatorSettings } from '@/lib/socket'
 
@@ -23,6 +23,18 @@ export function IndicatorsPanel({ open, onClose }: Props) {
 
   const [stApplied,  setStApplied]  = useState(false)
   const [atrApplied, setAtrApplied] = useState(false)
+
+  // Keep input strings in sync with store values — handles both
+  // remount (dashboard page unmount/remount) and backend-confirmed updates.
+  useEffect(() => {
+    setStLength(String(market.indicatorSettings.supertrend.length))
+    setStMult(String(market.indicatorSettings.supertrend.multiplier))
+  }, [market.indicatorSettings.supertrend.length, market.indicatorSettings.supertrend.multiplier])
+
+  useEffect(() => {
+    setAtrPeriod(String(market.indicatorSettings.atr.period))
+    setAtrThresh(String(market.indicatorSettings.atr.threshold))
+  }, [market.indicatorSettings.atr.period, market.indicatorSettings.atr.threshold])
 
   function applyStSettings() {
     updateIndicatorSettings({

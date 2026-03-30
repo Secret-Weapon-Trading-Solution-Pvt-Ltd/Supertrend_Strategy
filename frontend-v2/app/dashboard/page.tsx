@@ -22,7 +22,6 @@ import { useTrade }  from '@/store/TradeStore'
 
 import {
   startEngine, stopEngine, pauseEngine, resumeEngine,
-  subscribeIndicators, unsubscribeIndicators,
   switchMode, getExitSettings, updateExitSettings,
 } from '@/lib/socket'
 import { getStatus, getTimeframes, getTrades } from '@/lib/api'
@@ -37,14 +36,17 @@ export default function DashboardPage() {
   const router = useRouter()
 
   const { state: auth, setAuth, setTickerStatus }               = useAuth()
-  const { state: engine, setSymbol, setTimeframe, setTimeframes, setQty } = useEngine()
+  const { state: engine, setSymbol, setTimeframe, setTimeframes, setQty, setInitialized, setExitSettings } = useEngine()
   const { state: market }                                       = useMarket()
   const { setTrades }                                           = useTrade()
 
-  const [qtyInput,     setQtyInput]     = useState('')
-  const [indOpen,      setIndOpen]      = useState(false)
-  const [istTime,      setIstTime]      = useState('')
-  const [initialized,  setInitialized]  = useState(false)
+  const [qtyInput,  setQtyInput] = useState(() => engine.qty > 1 ? String(engine.qty) : '')
+  const [indOpen,   setIndOpen]  = useState(false)
+  const [istTime,   setIstTime]  = useState('')
+
+  // initialized and exitSettings live in the store so they survive navigation
+  const initialized  = engine.initialized
+  const exitSettings = engine.exitSettings
 
   useEffect(() => {
     function tick() {
@@ -61,16 +63,6 @@ export default function DashboardPage() {
     return () => clearInterval(id)
   }, [])
 
-  const [exitSettings, setExitSettings] = useState<ExitSettingsPayload>({
-    target_type:      'points',
-    target_value:     20,
-    sl_type:          'points',
-    sl_value:         10,
-    trailing_sl:      true,
-    trail_value:      5,
-    exit_on_st_red:   true,
-    session_end_time: '15:15',
-  })
 
   function handleSymbolSelect(inst: Instrument) {
     setSymbol(inst)
@@ -86,6 +78,9 @@ export default function DashboardPage() {
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
+      // Skip if already initialized — prevents re-running on return navigation
+      if (engine.initialized) return
+
       // Gate on Keycloak token — Zerodha connection is independent of KC auth
       const stored = typeof window !== 'undefined' ? (localStorage.getItem(TOKEN_KEY) ?? '') : ''
       if (!isTokenValid(stored)) { router.replace('/'); return }
@@ -105,35 +100,23 @@ export default function DashboardPage() {
         if (tfs.length > 0 && !engine.selectedTimeframe) setTimeframe(tfs[0])
       } catch (e) { console.error('timeframes:', e) }
       try { setTrades(await getTrades()) } catch (e) { console.error('trades:', e) }
-      setInitialized(true)
+      setInitialized()
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Exit settings sync ────────────────────────────────────────────────────
+  // ── Exit settings — fetch from backend once WS connects ──────────────────
+  // EXIT_SETTINGS_APPLIED updates are handled by EngineStore (persists across navigation).
+  // We only need to request current settings on each WS connection.
   useEffect(() => {
-    const onApplied = (data: ExitSettingsPayload) => setExitSettings(data)
-    eventBus.on(EVENTS.EXIT_SETTINGS_APPLIED, onApplied)
-
-    // Fetch current settings once WS connects
     const onConnected = () => getExitSettings()
     eventBus.on(EVENTS.WS_CONNECTED, onConnected)
-
-    return () => {
-      eventBus.off(EVENTS.EXIT_SETTINGS_APPLIED, onApplied)
-      eventBus.off(EVENTS.WS_CONNECTED, onConnected)
-    }
+    return () => { eventBus.off(EVENTS.WS_CONNECTED, onConnected) }
   }, [])
 
-  // ── Indicator subscribe ───────────────────────────────────────────────────
-  useEffect(() => {
-    const sym = engine.selectedSymbol
-    const tf  = engine.selectedTimeframe
-    if (!sym || !tf) return
-    subscribeIndicators({ token: sym.token, interval: tf.interval })
-    return () => unsubscribeIndicators()
-  }, [engine.selectedSymbol?.token, engine.selectedTimeframe?.interval])
+  // subscribeIndicators is managed by dashboard/layout.tsx so it
+  // persists across sub-page navigation without dropping the stream.
 
   // ── Engine handlers ───────────────────────────────────────────────────────
   function handleStart() {
@@ -529,8 +512,7 @@ export default function DashboardPage() {
         <ExitSettingsCard
           settings={exitSettings}
           onChange={(patch) => {
-            const next = { ...exitSettings, ...patch }
-            setExitSettings(next)
+            setExitSettings({ ...exitSettings, ...patch })
             updateExitSettings(patch)
           }}
         />

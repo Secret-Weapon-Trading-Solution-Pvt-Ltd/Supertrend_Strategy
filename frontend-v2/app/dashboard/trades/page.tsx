@@ -38,12 +38,21 @@ export default function TradesPage() {
       }, 50)
     }
 
-    eventBus.on(EVENTS.TRADELOG_HISTORY, onHistory)
+    // Refetch completed trades after exit — backend commits to DB after emitting the event
+    const onExit = () => {
+      setTimeout(() => {
+        getTrades(500).then(setTrades).catch(console.error)
+      }, 600)
+    }
+
+    eventBus.on(EVENTS.TRADELOG_HISTORY,  onHistory)
     eventBus.on(EVENTS.TRADELOG_RECEIVED, onNew)
+    eventBus.on(EVENTS.EXIT_TRIGGERED,    onExit)
 
     return () => {
-      eventBus.off(EVENTS.TRADELOG_HISTORY, onHistory)
+      eventBus.off(EVENTS.TRADELOG_HISTORY,  onHistory)
       eventBus.off(EVENTS.TRADELOG_RECEIVED, onNew)
+      eventBus.off(EVENTS.EXIT_TRIGGERED,    onExit)
     }
   }, [])
 
@@ -127,7 +136,7 @@ export default function TradesPage() {
           style={{ background: 'var(--theme-accent)', filter: 'blur(48px)', opacity: 0.18 }} />
 
         <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-          <StatCard label="Total Trades"  value={String(trades.length)}
+          <StatCard label="Total Trades"  value={String(filteredTrades.length)}
             valueColor="var(--theme-text-primary)" />
           <StatCard label="Win Rate"      value={`${winRate}%`}
             valueColor="var(--theme-accent)"

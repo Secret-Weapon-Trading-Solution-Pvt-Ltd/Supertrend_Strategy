@@ -173,12 +173,16 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     const onReset = () =>
       dispatch({ type: 'RESET_MARKET_DATA' })
 
+    const onExit = () =>
+      dispatch({ type: 'CLEAR_POSITION' })
+
     eventBus.on(EVENTS.TICK_RECEIVED,              onTick)
     eventBus.on(EVENTS.INDICATORS_DATA,            onIndicators)
     eventBus.on(EVENTS.POSITION_UPDATE,            onPosition)
     eventBus.on(EVENTS.INDICATOR_STATE,            onIndicatorState)
     eventBus.on(EVENTS.INDICATOR_SETTINGS_APPLIED, onIndicatorSettings)
     eventBus.on(EVENTS.RESET_MARKET_DATA,          onReset)
+    eventBus.on(EVENTS.EXIT_TRIGGERED,             onExit)
 
     return () => {
       eventBus.off(EVENTS.TICK_RECEIVED,              onTick)
@@ -187,6 +191,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       eventBus.off(EVENTS.INDICATOR_STATE,            onIndicatorState)
       eventBus.off(EVENTS.INDICATOR_SETTINGS_APPLIED, onIndicatorSettings)
       eventBus.off(EVENTS.RESET_MARKET_DATA,          onReset)
+      eventBus.off(EVENTS.EXIT_TRIGGERED,             onExit)
     }
   }, [])
 
